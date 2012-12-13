@@ -62,14 +62,55 @@ tag_re = (re.compile('(%s.*?%s|%s.*?%s|%s.*?%s)' %
            re.escape(VARIABLE_TAG_START), re.escape(VARIABLE_TAG_END),
            re.escape(COMMENT_TAG_START), re.escape(COMMENT_TAG_END))))
 
-# global dictionary of libraries that have been loaded using get_library
-libraries = {}
 # global list of libraries to load by default for a new parser
 builtins = []
 
 # True if TEMPLATE_STRING_IF_INVALID contains a format string (%s). None means
 # uninitialised.
 invalid_var_format_string = None
+
+class TemplateEngine(object):
+    def __init__(self):
+        self._libraries = {}
+
+    def get_library(self, library_name):
+        """
+        Load the template library module with the given name.
+
+        If library is not already loaded loop over all templatetags modules
+        to locate it.
+
+        {% load somelib %} and {% load someotherlib %} loops twice.
+
+        Subsequent loads eg. {% load somelib %} in the same process will grab
+        the cached module from libraries.
+
+        """
+
+        lib = self._libraries.get(library_name, None)
+        if not lib:
+            templatetags_modules = get_templatetags_modules()
+            tried_modules = []
+            for module in templatetags_modules:
+                taglib_module = '%s.%s' % (module, library_name)
+                tried_modules.append(taglib_module)
+                lib = import_library(taglib_module)
+                if lib:
+                    self._libraries[library_name] = lib
+                    break
+            if not lib:
+                raise InvalidTemplateLibrary(
+                    "Template library %s not found, tried %s" %
+                    (library_name,
+                     ','.join(tried_modules)))
+        return lib
+
+    def add_library(self, name, library):
+        self._libraries[name] = library
+
+
+default_engine = TemplateEngine()
+
 
 class TemplateSyntaxError(Exception):
     pass
@@ -1293,35 +1334,7 @@ def get_templatetags_modules():
     return templatetags_modules
 
 def get_library(library_name):
-    """
-    Load the template library module with the given name.
-
-    If library is not already loaded loop over all templatetags modules
-    to locate it.
-
-    {% load somelib %} and {% load someotherlib %} loops twice.
-
-    Subsequent loads eg. {% load somelib %} in the same process will grab
-    the cached module from libraries.
-    """
-    lib = libraries.get(library_name, None)
-    if not lib:
-        templatetags_modules = get_templatetags_modules()
-        tried_modules = []
-        for module in templatetags_modules:
-            taglib_module = '%s.%s' % (module, library_name)
-            tried_modules.append(taglib_module)
-            lib = import_library(taglib_module)
-            if lib:
-                libraries[library_name] = lib
-                break
-        if not lib:
-            raise InvalidTemplateLibrary("Template library %s not found, "
-                                         "tried %s" %
-                                         (library_name,
-                                          ','.join(tried_modules)))
-    return lib
-
+    return default_engine.get_library(library_name)
 
 def add_to_builtins(module):
     builtins.append(import_library(module))
