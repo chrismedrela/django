@@ -79,7 +79,7 @@ register.tag("echo", do_echo)
 register.tag("other_echo", do_echo)
 register.filter("upper", do_upper)
 
-template.libraries['testtags'] = register
+template.default_engine._libraries['testtags'] = register
 
 #####################################
 # Helper objects for template tests #
