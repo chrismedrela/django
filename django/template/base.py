@@ -71,6 +71,12 @@ builtins = []
 # uninitialised.
 invalid_var_format_string = None
 
+class TemplateEngine(object):
+    def __init__(self):
+        pass
+default_engine = TemplateEngine()
+
+
 class TemplateSyntaxError(Exception):
     pass
 
