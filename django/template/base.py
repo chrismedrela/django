@@ -74,6 +74,10 @@ invalid_var_format_string = None
 class TemplateEngine(object):
     def __init__(self):
         pass
+
+    def get_library(self, library_name):
+        return old_get_library(library_name)
+
 default_engine = TemplateEngine()
 
 
@@ -1292,6 +1296,9 @@ def get_templatetags_modules():
     return templatetags_modules
 
 def get_library(library_name):
+    return default_engine.get_library(library_name)
+
+def old_get_library(library_name):
     """
     Load the template library module with the given name.
 
