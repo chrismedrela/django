@@ -1015,7 +1015,7 @@ def load(parser, token):
     if len(bits) >= 4 and bits[-2] == "from":
         try:
             taglib = bits[-1]
-            lib = get_library(taglib)
+            lib = parser.engine.get_library(taglib)
         except InvalidTemplateLibrary as e:
             raise TemplateSyntaxError("'%s' is not a valid tag library: %s" %
                                       (taglib, e))
@@ -1037,7 +1037,7 @@ def load(parser, token):
         for taglib in bits[1:]:
             # add the library to the parser
             try:
-                lib = get_library(taglib)
+                lib = parser.engine.get_library(taglib)
                 parser.add_library(lib)
             except InvalidTemplateLibrary as e:
                 raise TemplateSyntaxError("'%s' is not a valid tag library: %s" %

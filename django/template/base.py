@@ -61,9 +61,6 @@ tag_re = (re.compile('(%s.*?%s|%s.*?%s|%s.*?%s)' %
           (re.escape(BLOCK_TAG_START), re.escape(BLOCK_TAG_END),
            re.escape(VARIABLE_TAG_START), re.escape(VARIABLE_TAG_END),
            re.escape(COMMENT_TAG_START), re.escape(COMMENT_TAG_END))))
-
-# global dictionary of libraries that have been loaded using get_library
-#libraries = {}
 # global list of libraries to load by default for a new parser
 builtins = []
 
