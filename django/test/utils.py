@@ -5,7 +5,7 @@ from xml.dom.minidom import parseString, Node
 from django.conf import settings, UserSettingsHolder
 from django.core import mail
 from django.test.signals import template_rendered, setting_changed
-from django.template import Template, loader, TemplateDoesNotExist
+from django.template import _Template, loader, TemplateDoesNotExist
 from django.template.loaders import cached
 from django.utils.translation import deactivate
 from django.utils.functional import wraps
@@ -71,8 +71,8 @@ def setup_test_environment():
         - Set the email backend to the locmem email backend.
         - Setting the active locale to match the LANGUAGE_CODE setting.
     """
-    Template.original_render = Template._render
-    Template._render = instrumented_test_render
+    _Template.original_render = _Template._render
+    _Template._render = instrumented_test_render
 
     mail.original_email_backend = settings.EMAIL_BACKEND
     settings.EMAIL_BACKEND = 'django.core.mail.backends.locmem.EmailBackend'
@@ -89,8 +89,8 @@ def teardown_test_environment():
         - Restoring the email sending functions
 
     """
-    Template._render = Template.original_render
-    del Template.original_render
+    _Template._render = _Template.original_render
+    del _Template.original_render
 
     settings.EMAIL_BACKEND = mail.original_email_backend
     del mail.original_email_backend

@@ -148,8 +148,8 @@ class StringOrigin(Origin):
     def reload(self):
         return self.source
 
-class Template(object):
-    def __init__(self, template_string, origin=None,
+class _Template(object):
+    def __init__(self, engine, template_string, origin=None,
                  name='<Unknown Template>'):
         try:
             template_string = force_text(template_string)
@@ -158,8 +158,9 @@ class Template(object):
                                         "from unicode or UTF-8 strings.")
         if settings.TEMPLATE_DEBUG and origin is None:
             origin = StringOrigin(template_string)
-        self.nodelist = compile_string(template_string, origin)
+        self.nodelist = engine.compile_string(template_string, origin)
         self.name = name
+        self.engine = engine
 
     def __iter__(self):
         for node in self.nodelist:
@@ -177,9 +178,11 @@ class Template(object):
         finally:
             context.render_context.pop()
 
+def Template(*args, **kwargs):
+    return _Template(default_engine, *args, **kwargs)
+
 def compile_string(*args, **kwargs):
     return default_engine.compile_string(*args, **kwargs)
-
 
 class Token(object):
     def __init__(self, token_type, contents):
@@ -1220,7 +1223,7 @@ class Library(object):
 
                     if not getattr(self, 'nodelist', False):
                         from django.template.loader import get_template, select_template
-                        if isinstance(file_name, Template):
+                        if isinstance(file_name, _Template):
                             t = file_name
                         elif not isinstance(file_name, six.string_types) and is_iterable(file_name):
                             t = select_template(file_name)
