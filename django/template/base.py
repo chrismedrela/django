@@ -94,6 +94,18 @@ class TemplateEngine(object):
                      ','.join(tried_modules)))
         return lib
 
+    def compile_string(self, template_string, origin):
+        "Compiles template_string into NodeList ready for rendering"
+
+        if settings.TEMPLATE_DEBUG:
+            from django.template.debug import DebugLexer, DebugParser
+            lexer_class, parser_class = DebugLexer, DebugParser
+        else:
+            lexer_class, parser_class = Lexer, _Parser
+        lexer = lexer_class(template_string, origin)
+        parser = parser_class(self, lexer.tokenize())
+        return parser.parse()
+
 
 default_engine = TemplateEngine()
 
@@ -168,16 +180,9 @@ class Template(object):
         finally:
             context.render_context.pop()
 
-def compile_string(template_string, origin):
-    "Compiles template_string into NodeList ready for rendering"
-    if settings.TEMPLATE_DEBUG:
-        from django.template.debug import DebugLexer, DebugParser
-        lexer_class, parser_class = DebugLexer, DebugParser
-    else:
-        lexer_class, parser_class = Lexer, _Parser
-    lexer = lexer_class(template_string, origin)
-    parser = parser_class(default_engine, lexer.tokenize())
-    return parser.parse()
+def compile_string(*args, **kwargs):
+    return default_engine.compile_string(*args, **kwargs)
+
 
 class Token(object):
     def __init__(self, token_type, contents):
