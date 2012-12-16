@@ -64,7 +64,7 @@ from django.template.base import (ContextPopException, InvalidTemplateLibrary,
 
 # Template parts
 from django.template.base import (Context, FilterExpression, Lexer, Node,
-    NodeList, Parser, RequestContext, Origin, StringOrigin, Template,
+    NodeList, Parser, RequestContext, Origin, StringOrigin, Template, _Template,
     TextNode, Token, TokenParser, Variable, VariableNode, constant_string,
     filter_raw_string)
 
