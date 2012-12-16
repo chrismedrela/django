@@ -7,7 +7,7 @@ The Lexer.tokenize() function converts a template string (i.e., a string contain
 markup with custom template tags) to tokens, which can be either plain text
 (TOKEN_TEXT), variables (TOKEN_VAR) or block statements (TOKEN_BLOCK).
 
-The Parser() class takes a list of tokens in its constructor, and its parse()
+The _Parser() class takes a list of tokens in its constructor, and its parse()
 method returns a compiled template -- which is, under the hood, a list of
 Node objects.
 
@@ -64,7 +64,7 @@ from django.template.base import (ContextPopException, InvalidTemplateLibrary,
 
 # Template parts
 from django.template.base import (Context, FilterExpression, Lexer, Node,
-    NodeList, Parser, RequestContext, Origin, StringOrigin, Template,
+    NodeList, _Parser, RequestContext, Origin, StringOrigin, Template,
     TextNode, Token, TokenParser, Variable, VariableNode, constant_string,
     filter_raw_string)
 
@@ -77,6 +77,6 @@ from django.template.base import (Library, add_to_builtins, builtins,
     get_library, get_templatetags_modules, get_text_list, import_library)
 
 # Engine
-from django.template.base import default_engine
+from django.template.base import default_engine, TemplateEngine
 
 __all__ = ('Template', 'Context', 'RequestContext', 'compile_string')

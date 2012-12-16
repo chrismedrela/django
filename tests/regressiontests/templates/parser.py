@@ -3,8 +3,8 @@ Testing some internals of the template processing. These are *not* examples to b
 """
 from __future__ import unicode_literals
 
-from django.template import (TokenParser, FilterExpression, Parser, Variable,
-    TemplateSyntaxError)
+from django.template import (TokenParser, FilterExpression, _Parser, Variable,
+    TemplateSyntaxError, TemplateEngine)
 from django.utils.unittest import TestCase
 
 
@@ -36,7 +36,8 @@ class ParserTests(TestCase):
 
     def test_filter_parsing(self):
         c = {"article": {"section": "News"}}
-        p = Parser("")
+        engine = TemplateEngine()
+        p = _Parser(engine, "")
 
         def fe_test(s, val):
             self.assertEqual(FilterExpression(s, p).resolve(c), val)

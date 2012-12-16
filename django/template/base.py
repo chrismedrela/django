@@ -174,9 +174,9 @@ def compile_string(template_string, origin):
         from django.template.debug import DebugLexer, DebugParser
         lexer_class, parser_class = DebugLexer, DebugParser
     else:
-        lexer_class, parser_class = Lexer, Parser
+        lexer_class, parser_class = Lexer, _Parser
     lexer = lexer_class(template_string, origin)
-    parser = parser_class(lexer.tokenize())
+    parser = parser_class(default_engine, lexer.tokenize())
     return parser.parse()
 
 class Token(object):
@@ -257,11 +257,12 @@ class Lexer(object):
         self.lineno += token_string.count('\n')
         return token
 
-class Parser(object):
-    def __init__(self, tokens):
+class _Parser(object):
+    def __init__(self, engine, tokens):
         self.tokens = tokens
         self.tags = {}
         self.filters = {}
+        self.engine = engine
         for lib in builtins:
             self.add_library(lib)
 
@@ -384,6 +385,10 @@ class Parser(object):
             return self.filters[filter_name]
         else:
             raise TemplateSyntaxError("Invalid filter: '%s'" % filter_name)
+
+def Parser(*args, **kwargs):
+    return _Parser(default_engine, *args, **kwargs)
+
 
 class TokenParser(object):
     """
