@@ -31,8 +31,8 @@ class DebugLexer(Lexer):
         return token
 
 class DebugParser(Parser):
-    def __init__(self, lexer):
-        super(DebugParser, self).__init__(lexer)
+    def __init__(self, *args, **kwargs):
+        super(DebugParser, self).__init__(*args, **kwargs)
         self.command_stack = []
 
     def enter_command(self, command, token):

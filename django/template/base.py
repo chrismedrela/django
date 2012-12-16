@@ -108,6 +108,18 @@ class TemplateEngine(object):
     def add_library(self, name, library):
         self._libraries[name] = library
 
+    def compile_string(self, template_string, origin):
+        """ Compiles template_string into NodeList ready for rendering. """
+
+        if settings.TEMPLATE_DEBUG:
+            from django.template.debug import DebugLexer, DebugParser
+            lexer_class, parser_class = DebugLexer, DebugParser
+        else:
+            lexer_class, parser_class = Lexer, Parser
+        lexer = lexer_class(template_string, origin)
+        parser = parser_class(self, lexer.tokenize())
+        return parser.parse()
+
 
 default_engine = TemplateEngine()
 
@@ -182,16 +194,9 @@ class Template(object):
         finally:
             context.render_context.pop()
 
-def compile_string(template_string, origin):
-    "Compiles template_string into NodeList ready for rendering"
-    if settings.TEMPLATE_DEBUG:
-        from django.template.debug import DebugLexer, DebugParser
-        lexer_class, parser_class = DebugLexer, DebugParser
-    else:
-        lexer_class, parser_class = Lexer, Parser
-    lexer = lexer_class(template_string, origin)
-    parser = parser_class(lexer.tokenize())
-    return parser.parse()
+def compile_string(*args, **kwargs):
+    return default_engine.compile_string(*args, **kwargs)
+
 
 class Token(object):
     def __init__(self, token_type, contents):
@@ -272,10 +277,11 @@ class Lexer(object):
         return token
 
 class Parser(object):
-    def __init__(self, tokens):
+    def __init__(self, engine, tokens):
         self.tokens = tokens
         self.tags = {}
         self.filters = {}
+        self.engine = engine
         for lib in builtins:
             self.add_library(lib)
 
@@ -405,6 +411,7 @@ class Parser(object):
             return self.filters[filter_name]
         else:
             raise TemplateSyntaxError("Invalid filter: '%s'" % filter_name)
+
 
 class TokenParser(object):
     """
@@ -1061,7 +1068,7 @@ def generic_tag_compiler(parser, token, params, varargs, varkw, defaults,
     bits = token.split_contents()[1:]
     args, kwargs = parse_bits(parser, bits, params, varargs, varkw,
                               defaults, takes_context, name)
-    return node_class(takes_context, args, kwargs)
+    return node_class(takes_context, args, kwargs, parser.engine)
 
 class TagHelperNode(Node):
     """
@@ -1070,10 +1077,11 @@ class TagHelperNode(Node):
     to the decorated function.
     """
 
-    def __init__(self, takes_context, args, kwargs):
+    def __init__(self, takes_context, args, kwargs, engine):
         self.takes_context = takes_context
         self.args = args
         self.kwargs = kwargs
+        self.engine = engine
 
     def get_resolved_arguments(self, context):
         resolved_args = [var.resolve(context) for var in self.args]
@@ -1185,8 +1193,9 @@ class Library(object):
             params, varargs, varkw, defaults = getargspec(func)
 
             class AssignmentNode(TagHelperNode):
-                def __init__(self, takes_context, args, kwargs, target_var):
-                    super(AssignmentNode, self).__init__(takes_context, args, kwargs)
+                def __init__(self, takes_context, args, kwargs, engine, target_var):
+                    super(AssignmentNode, self).__init__( \
+                        takes_context, args, kwargs, engine)
                     self.target_var = target_var
 
                 def render(self, context):
@@ -1207,7 +1216,8 @@ class Library(object):
                 bits = bits[:-2]
                 args, kwargs = parse_bits(parser, bits, params,
                     varargs, varkw, defaults, takes_context, function_name)
-                return AssignmentNode(takes_context, args, kwargs, target_var)
+                return AssignmentNode(takes_context, args, kwargs,
+                                      parser.engine, target_var)
 
             compile_func.__doc__ = func.__doc__
             self.tag(function_name, compile_func)
@@ -1222,7 +1232,8 @@ class Library(object):
         else:
             raise TemplateSyntaxError("Invalid arguments provided to assignment_tag")
 
-    def inclusion_tag(self, file_name, context_class=Context, takes_context=False, name=None):
+    def inclusion_tag(self, file_name, context_class=Context,
+                      takes_context=False, name=None):
         def dec(func):
             params, varargs, varkw, defaults = getargspec(func)
 
