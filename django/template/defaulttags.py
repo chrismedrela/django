@@ -7,7 +7,7 @@ from datetime import datetime
 from itertools import groupby, cycle as itertools_cycle
 
 from django.conf import settings
-from django.template.base import (Node, NodeList, Template, Context, Library,
+from django.template.base import (Node, NodeList, _Template, Context, Library,
     TemplateSyntaxError, VariableDoesNotExist, InvalidTemplateLibrary,
     BLOCK_TAG_START, BLOCK_TAG_END, VARIABLE_TAG_START, VARIABLE_TAG_END,
     SINGLE_BRACE_START, SINGLE_BRACE_END, COMMENT_TAG_START, COMMENT_TAG_END,
@@ -318,9 +318,10 @@ def include_is_allowed(filepath):
     return False
 
 class SsiNode(Node):
-    def __init__(self, filepath, parsed):
+    def __init__(self, filepath, parsed, engine):
         self.filepath = filepath
         self.parsed = parsed
+        self.engine = engine
 
     def render(self, context):
         filepath = self.filepath.resolve(context)
@@ -337,7 +338,7 @@ class SsiNode(Node):
             output = ''
         if self.parsed:
             try:
-                t = Template(output, name=filepath)
+                t = _Template(self.engine, output, name=filepath)
                 return t.render(context)
             except TemplateSyntaxError as e:
                 if settings.DEBUG:
@@ -993,7 +994,7 @@ def ssi(parser, token):
             raise TemplateSyntaxError("Second (optional) argument to %s tag"
                                       " must be 'parsed'" % bits[0])
     filepath = parser.compile_filter(bits[1])
-    return SsiNode(filepath, parsed)
+    return SsiNode(filepath, parsed, parser.engine)
 
 @register.tag
 def load(parser, token):

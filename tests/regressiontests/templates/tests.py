@@ -20,7 +20,7 @@ except ImportError:     # Python 2
 
 from django import template
 from django.template import (base as template_base, Context, RequestContext,
-    Template)
+    _Template)
 from django.core import urlresolvers
 from django.template import loader
 from django.template.loaders import app_directories, filesystem, cached
@@ -165,6 +165,9 @@ class UTF8Class:
 
 @override_settings(MEDIA_URL="/media/", STATIC_URL="/static/")
 class Templates(TestCase):
+
+    def setUp(self):
+        self.engine = template.TemplateEngine()
 
     def test_loaders_security(self):
         ad_loader = app_directories.Loader()
@@ -365,16 +368,14 @@ class Templates(TestCase):
     @override_settings(SETTINGS_MODULE=None, TEMPLATE_DEBUG=True)
     def test_url_reverse_no_settings_module(self):
         # Regression test for #9005
-        from django.template import Template, Context
-
-        t = Template('{% url will_not_match %}')
+        t = _Template(self.engine, '{% url will_not_match %}')
         c = Context()
         with self.assertRaises(urlresolvers.NoReverseMatch):
             t.render(c)
 
     def test_url_explicit_exception_for_old_syntax_at_run_time(self):
         # Regression test for #19280
-        t = Template('{% url path.to.view %}')      # not quoted = old syntax
+        t = _Template(self.engine, '{% url path.to.view %}')      # not quoted = old syntax
         c = Context()
         with six.assertRaisesRegex(self, urlresolvers.NoReverseMatch,
                 "The syntax changed in Django 1.5, see the docs."):
@@ -384,7 +385,7 @@ class Templates(TestCase):
         # Regression test for #19392
         with six.assertRaisesRegex(self, template.TemplateSyntaxError,
                 "The syntax of 'url' changed in Django 1.5, see the docs."):
-            t = Template('{% url my-view %}')      # not a variable = old syntax
+            t = _Template(self.engine, '{% url my-view %}')
 
     @override_settings(DEBUG=True, TEMPLATE_DEBUG=True)
     def test_no_wrapped_exception(self):
@@ -393,7 +394,7 @@ class Templates(TestCase):
         Refs #16770
         """
         c = Context({"coconuts": lambda: 42 / 0})
-        t = Template("{{ coconuts }}")
+        t = _Template(self.engine, "{{ coconuts }}")
         with self.assertRaises(ZeroDivisionError) as cm:
             t.render(c)
 
@@ -401,10 +402,9 @@ class Templates(TestCase):
 
     def test_invalid_block_suggestion(self):
         # See #7876
-        from django.template import Template, TemplateSyntaxError
         try:
-            t = Template("{% if 1 %}lala{% endblock %}{% endif %}")
-        except TemplateSyntaxError as e:
+            t = _Template(self.engine, "{% if 1 %}lala{% endblock %}{% endif %}")
+        except template.TemplateSyntaxError as e:
             self.assertEqual(e.args[0], "Invalid block tag: 'endblock', expected 'elif', 'else' or 'endif'")
 
     def test_templates(self):
@@ -1177,10 +1177,10 @@ class Templates(TestCase):
             'inheritance23': ("{% extends 'inheritance20' %}{% block first %}{{ block.super }}b{% endblock %}", {}, '1&ab3_'),
 
             # Inheritance from local context without use of template loader
-            'inheritance24': ("{% extends context_template %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", {'context_template': template.Template("1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")}, '1234'),
+            'inheritance24': ("{% extends context_template %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", {'context_template': template._Template(self.engine, "1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")}, '1234'),
 
             # Inheritance from local context with variable parent template
-            'inheritance25': ("{% extends context_template.1 %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", {'context_template': [template.Template("Wrong"), template.Template("1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")]}, '1234'),
+            'inheritance25': ("{% extends context_template.1 %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", {'context_template': [template._Template(self.engine, "Wrong"), template._Template(self.engine, "1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")]}, '1234'),
 
             # Set up a base template to extend
             'inheritance26': ("no tags", {}, 'no tags'),
@@ -1676,6 +1676,7 @@ class TemplateTagLoading(unittest.TestCase):
         self.egg_dir = '%s/eggs' % os.path.dirname(upath(__file__))
         self.old_tag_modules = template_base.templatetags_modules
         template_base.templatetags_modules = []
+        self.engine = template.TemplateEngine()
 
     def tearDown(self):
         settings.INSTALLED_APPS = self.old_apps
@@ -1683,39 +1684,44 @@ class TemplateTagLoading(unittest.TestCase):
         template_base.templatetags_modules = self.old_tag_modules
 
     def test_load_error(self):
-        ttext = "{% load broken_tag %}"
-        self.assertRaises(template.TemplateSyntaxError, template.Template, ttext)
+        source = "{% load broken_tag %}"
+        self.assertRaises(template.TemplateSyntaxError,
+                          template._Template,
+                          self.engine, source)
         try:
-            template.Template(ttext)
+            template._Template(self.engine, source)
         except template.TemplateSyntaxError as e:
             self.assertTrue('ImportError' in e.args[0])
             self.assertTrue('Xtemplate' in e.args[0])
 
     def test_load_error_egg(self):
-        ttext = "{% load broken_egg %}"
+        source = "{% load broken_egg %}"
         egg_name = '%s/tagsegg.egg' % self.egg_dir
         sys.path.append(egg_name)
         settings.INSTALLED_APPS = ('tagsegg',)
-        self.assertRaises(template.TemplateSyntaxError, template.Template, ttext)
+        self.assertRaises(template.TemplateSyntaxError,
+                          template._Template,
+                          self.engine, source)
         try:
-            template.Template(ttext)
+            template._Template(self.engine, source)
         except template.TemplateSyntaxError as e:
             self.assertTrue('ImportError' in e.args[0])
             self.assertTrue('Xtemplate' in e.args[0])
 
     def test_load_working_egg(self):
-        ttext = "{% load working_egg %}"
+        source = "{% load working_egg %}"
         egg_name = '%s/tagsegg.egg' % self.egg_dir
         sys.path.append(egg_name)
         settings.INSTALLED_APPS = ('tagsegg',)
-        t = template.Template(ttext)
+        t = template._Template(self.engine, source)
 
 
 class RequestContextTests(unittest.TestCase):
 
     def setUp(self):
+        self.engine = template.TemplateEngine()
         templates = {
-            'child': Template('{{ var|default:"none" }}'),
+            'child': _Template(self.engine, '{{ var|default:"none" }}'),
         }
         setup_test_template_loader(templates)
         self.fake_request = RequestFactory().get('/')
@@ -1730,10 +1736,10 @@ class RequestContextTests(unittest.TestCase):
         """
         ctx = RequestContext(self.fake_request, {'var': 'parent'})
         self.assertEqual(
-            template.Template('{% include "child" %}').render(ctx),
+            _Template(self.engine, '{% include "child" %}').render(ctx),
             'parent'
         )
         self.assertEqual(
-            template.Template('{% include "child" only %}').render(ctx),
+            _Template(self.engine, '{% include "child" only %}').render(ctx),
             'none'
         )
