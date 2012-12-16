@@ -105,6 +105,7 @@ class TemplateEngine(object):
 
 
 default_engine = TemplateEngine()
+#default_engine = None
 
 
 class TemplateSyntaxError(Exception):
