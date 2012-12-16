@@ -4,7 +4,7 @@ Testing some internals of the template processing. These are *not* examples to b
 from __future__ import unicode_literals
 
 from django.template import (TokenParser, FilterExpression, Parser, Variable,
-    Template, TemplateSyntaxError)
+    Template, TemplateSyntaxError, TemplateEngine)
 from django.test.utils import override_settings
 from django.utils.unittest import TestCase
 from django.utils import six
@@ -38,7 +38,8 @@ class ParserTests(TestCase):
 
     def test_filter_parsing(self):
         c = {"article": {"section": "News"}}
-        p = Parser("")
+        engine = TemplateEngine()
+        p = Parser(engine, "")
 
         def fe_test(s, val):
             self.assertEqual(FilterExpression(s, p).resolve(c), val)

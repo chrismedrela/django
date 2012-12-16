@@ -77,6 +77,6 @@ from django.template.base import (Library, add_to_builtins, builtins,
     get_library, get_templatetags_modules, get_text_list, import_library)
 
 # Engine
-from django.template.base import default_engine
+from django.template.base import default_engine, TemplateEngine
 
 __all__ = ('Template', 'Context', 'RequestContext', 'compile_string')
