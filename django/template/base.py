@@ -62,16 +62,17 @@ tag_re = (re.compile('(%s.*?%s|%s.*?%s|%s.*?%s)' %
            re.escape(VARIABLE_TAG_START), re.escape(VARIABLE_TAG_END),
            re.escape(COMMENT_TAG_START), re.escape(COMMENT_TAG_END))))
 
-# global list of libraries to load by default for a new parser
-builtins = []
-
 # True if TEMPLATE_STRING_IF_INVALID contains a format string (%s). None means
 # uninitialised.
 invalid_var_format_string = None
 
+
 class TemplateEngine(object):
     def __init__(self):
         self._libraries = {}
+        self._template_source_loaders = None
+        # global list of libraries to load by default for a new parser
+        self._builtins = []
 
     def get_library(self, library_name):
         """
@@ -120,6 +121,88 @@ class TemplateEngine(object):
         parser = parser_class(self, lexer.tokenize())
         return parser.parse()
 
+    def find_template(self, name, dirs=None):
+        if self._template_source_loaders is None:
+            self._template_source_loaders = _calculate_template_source_loaders()
+
+        for loader in self._template_source_loaders:
+            try:
+                source, display_name = loader(name, dirs)
+                return (source, make_origin(display_name, loader, name, dirs))
+            except TemplateDoesNotExist:
+                pass
+        raise TemplateDoesNotExist(name)
+
+    def add_to_builtins(self, library):
+        if not isinstance(library, Library):
+            library = import_library(library)
+        self._builtins.append(library)
+
+    def get_template_source_loaders(self):
+        return self._template_source_loaders
+
+def TemplateEngineWithBuiltins(*args, **kwargs):
+    engine = TemplateEngine(*args, **kwargs)
+    builtins = [
+        'django.template.defaulttags',
+        'django.template.defaultfilters',
+        'django.template.loader_tags',
+    ]
+    for builtin in builtins:
+        engine.add_to_builtins(import_library(builtin))
+    return engine
+
+
+def find_template_loader(loader):
+    if isinstance(loader, (tuple, list)):
+        loader, args = loader[0], loader[1:]
+    else:
+        args = []
+    if isinstance(loader, six.string_types):
+        module, attr = loader.rsplit('.', 1)
+        try:
+            mod = import_module(module)
+        except ImportError as e:
+            raise ImproperlyConfigured('Error importing template source loader %s: "%s"' % (loader, e))
+        try:
+            TemplateLoader = getattr(mod, attr)
+        except AttributeError as e:
+            raise ImproperlyConfigured('Error importing template source loader %s: "%s"' % (loader, e))
+
+        if hasattr(TemplateLoader, 'load_template_source'):
+            func = TemplateLoader(*args)
+        else:
+            # Try loading module the old way - string is full path to callable
+            if args:
+                raise ImproperlyConfigured("Error importing template source loader %s - can't pass arguments to function-based loader." % loader)
+            func = TemplateLoader
+
+        if not func.is_usable:
+            import warnings
+            warnings.warn("Your TEMPLATE_LOADERS setting includes %r, but your Python installation doesn't support that type of template loading. Consider removing that line from TEMPLATE_LOADERS." % loader)
+            return None
+        else:
+            return func
+    else:
+        raise ImproperlyConfigured('Loader does not define a "load_template" callable template source loader')
+
+def make_origin(display_name, loader, name, dirs):
+    if settings.TEMPLATE_DEBUG and display_name:
+        return LoaderOrigin(display_name, loader, name, dirs)
+    else:
+        return None
+
+def _calculate_template_source_loaders():
+    # Warning! Don't call while the module is being importing. Calculating
+    # loaders at the time of importing module may cause circular import
+    # errors. See Django ticket #1292.
+
+    loaders = []
+    for loader_name in settings.TEMPLATE_LOADERS:
+        loader = find_template_loader(loader_name)
+        if loader is not None:
+            loaders.append(loader)
+    return tuple(loaders)
 
 default_engine = TemplateEngine()
 
@@ -156,6 +239,14 @@ class Origin(object):
 
     def __str__(self):
         return self.name
+
+class LoaderOrigin(Origin):
+    def __init__(self, display_name, loader, name, dirs):
+        super(LoaderOrigin, self).__init__(display_name)
+        self.loader, self.loadname, self.dirs = loader, name, dirs
+
+    def reload(self):
+        return self.loader(self.loadname, self.dirs)[0]
 
 class StringOrigin(Origin):
     def __init__(self, source):
@@ -285,7 +376,7 @@ class Parser(object):
         self.tags = {}
         self.filters = {}
         self.engine = engine
-        for lib in builtins:
+        for lib in engine._builtins:
             self.add_library(lib)
 
     def parse(self, parse_until=None):
@@ -1351,7 +1442,7 @@ def get_library(library_name):
     return default_engine.get_library(library_name)
 
 def add_to_builtins(module):
-    builtins.append(import_library(module))
+    default_engine.add_to_builtins(module)
 
 
 add_to_builtins('django.template.defaulttags')

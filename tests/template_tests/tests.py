@@ -22,7 +22,7 @@ import warnings
 from django import template
 from django.core import urlresolvers
 from django.template import (base as template_base, loader, Context,
-    RequestContext, _Template, TemplateSyntaxError)
+    RequestContext, _Template, TemplateSyntaxError, default_engine)
 from django.template.loaders import app_directories, filesystem, cached
 from django.test import RequestFactory, TestCase
 from django.test.utils import (setup_test_template_loader,
@@ -167,7 +167,7 @@ class UTF8Class:
 class Templates(TestCase):
 
     def setUp(self):
-        self.engine = template.TemplateEngine()
+        self.engine = template.TemplateEngineWithBuiltins()
 
     def test_loaders_security(self):
         ad_loader = app_directories.Loader()
@@ -226,10 +226,10 @@ class Templates(TestCase):
         # Turn TEMPLATE_DEBUG on, so that the origin file name will be kept with
         # the compiled templates.
         old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, True
-        old_loaders = loader.template_source_loaders
+        old_loaders = default_engine._template_source_loaders
 
         try:
-            loader.template_source_loaders = (filesystem.Loader(),)
+            default_engine._template_source_loaders = (filesystem.Loader(),)
 
             # We rely on the fact that runtests.py sets up TEMPLATE_DIRS to
             # point to a directory containing a login.html file. Also that
@@ -242,10 +242,10 @@ class Templates(TestCase):
             self.assertTrue(template_name.endswith(load_name),
                 'Template loaded by filesystem loader has incorrect name for debug page: %s' % template_name)
 
-            # Aso test the cached loader, since it overrides load_template
+            # Also test the cached loader, since it overrides load_template
             cache_loader = cached.Loader(('',))
-            cache_loader._cached_loaders = loader.template_source_loaders
-            loader.template_source_loaders = (cache_loader,)
+            cache_loader._cached_loaders = default_engine._template_source_loaders
+            default_engine._template_source_loaders = (cache_loader,)
 
             template = loader.get_template(load_name)
             template_name = template.nodelist[0].source[0].name
@@ -257,9 +257,8 @@ class Templates(TestCase):
             self.assertTrue(template_name.endswith(load_name),
                 'Cached template loaded through cached loader has incorrect name for debug page: %s' % template_name)
         finally:
-            loader.template_source_loaders = old_loaders
+            default_engine._template_source_loaders = old_loaders
             settings.TEMPLATE_DEBUG = old_td
-
 
     def test_include_missing_template(self):
         """
@@ -270,13 +269,13 @@ class Templates(TestCase):
         # TEMPLATE_DEBUG must be true, otherwise the exception raised
         # during {% include %} processing will be suppressed.
         old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, True
-        old_loaders = loader.template_source_loaders
+        old_loaders = default_engine._template_source_loaders
 
         try:
             # Test the base loader class via the app loader. load_template
             # from base is used by all shipped loaders excepting cached,
             # which has its own test.
-            loader.template_source_loaders = (app_directories.Loader(),)
+            default_engine._template_source_loaders = (app_directories.Loader(),)
 
             load_name = 'test_include_error.html'
             r = None
@@ -288,7 +287,7 @@ class Templates(TestCase):
                 self.assertEqual(e.args[0], 'missing.html')
             self.assertEqual(r, None, 'Template rendering unexpectedly succeeded, produced: ->%r<-' % r)
         finally:
-            loader.template_source_loaders = old_loaders
+            default_engine._template_source_loaders = old_loaders
             settings.TEMPLATE_DEBUG = old_td
 
 
@@ -303,13 +302,13 @@ class Templates(TestCase):
         # TEMPLATE_DEBUG must be true, otherwise the exception raised
         # during {% include %} processing will be suppressed.
         old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, True
-        old_loaders = loader.template_source_loaders
+        old_loaders = default_engine._template_source_loaders
 
         try:
             # Test the base loader class via the app loader. load_template
             # from base is used by all shipped loaders excepting cached,
             # which has its own test.
-            loader.template_source_loaders = (app_directories.Loader(),)
+            default_engine._template_source_loaders = (app_directories.Loader(),)
 
             load_name = 'test_extends_error.html'
             tmpl = loader.get_template(load_name)
@@ -321,7 +320,7 @@ class Templates(TestCase):
                 self.assertEqual(e.args[0], 'missing.html')
             self.assertEqual(r, None, 'Template rendering unexpectedly succeeded, produced: ->%r<-' % r)
         finally:
-            loader.template_source_loaders = old_loaders
+            default_engine._template_source_loaders = old_loaders
             settings.TEMPLATE_DEBUG = old_td
 
     def test_extends_include_missing_cachedloader(self):
@@ -331,12 +330,12 @@ class Templates(TestCase):
         """
 
         old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, True
-        old_loaders = loader.template_source_loaders
+        old_loaders = default_engine._template_source_loaders
 
         try:
             cache_loader = cached.Loader(('',))
             cache_loader._cached_loaders = (app_directories.Loader(),)
-            loader.template_source_loaders = (cache_loader,)
+            default_engine._template_source_loaders = (cache_loader,)
 
             load_name = 'test_extends_error.html'
             tmpl = loader.get_template(load_name)
@@ -356,7 +355,7 @@ class Templates(TestCase):
                 self.assertEqual(e.args[0], 'missing.html')
             self.assertEqual(r, None, 'Template rendering unexpectedly succeeded, produced: ->%r<-' % r)
         finally:
-            loader.template_source_loaders = old_loaders
+            default_engine._template_source_loaders = old_loaders
             settings.TEMPLATE_DEBUG = old_td
 
     def test_token_smart_split(self):
@@ -1761,7 +1760,7 @@ class TemplateTagLoading(unittest.TestCase):
         self.egg_dir = '%s/eggs' % os.path.dirname(upath(__file__))
         self.old_tag_modules = template_base.templatetags_modules
         template_base.templatetags_modules = []
-        self.engine = template.TemplateEngine()
+        self.engine = template.TemplateEngineWithBuiltins()
 
     def tearDown(self):
         settings.INSTALLED_APPS = self.old_apps
@@ -1804,7 +1803,7 @@ class TemplateTagLoading(unittest.TestCase):
 class RequestContextTests(unittest.TestCase):
 
     def setUp(self):
-        self.engine = template.TemplateEngine()
+        self.engine = template.TemplateEngineWithBuiltins()
         templates = {
             'child': _Template(self.engine, '{{ var|default:"none" }}'),
         }

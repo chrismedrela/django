@@ -4,7 +4,7 @@ Testing some internals of the template processing. These are *not* examples to b
 from __future__ import unicode_literals
 
 from django.template import (TokenParser, FilterExpression, Parser, Variable,
-    _Template, TemplateSyntaxError, TemplateEngine)
+    _Template, TemplateSyntaxError, TemplateEngineWithBuiltins)
 from django.test.utils import override_settings
 from django.utils.unittest import TestCase
 from django.utils import six
@@ -38,7 +38,7 @@ class ParserTests(TestCase):
 
     def test_filter_parsing(self):
         c = {"article": {"section": "News"}}
-        engine = TemplateEngine()
+        engine = TemplateEngineWithBuiltins()
         p = Parser(engine, "")
 
         def fe_test(s, val):
@@ -90,7 +90,7 @@ class ParserTests(TestCase):
     @override_settings(DEBUG=True, TEMPLATE_DEBUG=True)
     def test_compile_filter_error(self):
         # regression test for #19819
-        engine = TemplateEngine()
+        engine = TemplateEngineWithBuiltins()
 
         msg = "Could not parse the remainder: '@bar' from 'foo@bar'"
         with six.assertRaisesRegex(self, TemplateSyntaxError, msg) as cm:
