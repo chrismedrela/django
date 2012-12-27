@@ -26,12 +26,12 @@
 # installed, because pkg_resources is necessary to read eggs.
 
 from django.core.exceptions import ImproperlyConfigured
-from django.template.base import Origin, Template, Context, TemplateDoesNotExist, add_to_builtins
+from django.template.base import (Origin, Template, Context,
+    TemplateDoesNotExist, add_to_builtins, default_engine, make_origin)
+from django.utils.importlib import import_module
 from django.conf import settings
 from django.utils.module_loading import import_by_path
 from django.utils import six
-
-template_source_loaders = None
 
 class BaseLoader(object):
     is_usable = False
@@ -45,15 +45,7 @@ class BaseLoader(object):
     def load_template(self, template_name, template_dirs=None):
         source, display_name = self.load_template_source(template_name, template_dirs)
         origin = make_origin(display_name, self.load_template_source, template_name, template_dirs)
-        try:
-            template = get_template_from_string(source, origin, template_name)
-            return template, None
-        except TemplateDoesNotExist:
-            # If compiling the template we found raises TemplateDoesNotExist, back off to
-            # returning the source and display name for the template we were asked to load.
-            # This allows for correct identification (later) of the actual template that does
-            # not exist.
-            return source, display_name
+        return source, display_name
 
     def load_template_source(self, template_name, template_dirs=None):
         """
@@ -71,64 +63,9 @@ class BaseLoader(object):
         """
         pass
 
-class LoaderOrigin(Origin):
-    def __init__(self, display_name, loader, name, dirs):
-        super(LoaderOrigin, self).__init__(display_name)
-        self.loader, self.loadname, self.dirs = loader, name, dirs
-
-    def reload(self):
-        return self.loader(self.loadname, self.dirs)[0]
-
-def make_origin(display_name, loader, name, dirs):
-    if settings.TEMPLATE_DEBUG and display_name:
-        return LoaderOrigin(display_name, loader, name, dirs)
-    else:
-        return None
-
-def find_template_loader(loader):
-    if isinstance(loader, (tuple, list)):
-        loader, args = loader[0], loader[1:]
-    else:
-        args = []
-    if isinstance(loader, six.string_types):
-        TemplateLoader = import_by_path(loader)
-
-        if hasattr(TemplateLoader, 'load_template_source'):
-            func = TemplateLoader(*args)
-        else:
-            # Try loading module the old way - string is full path to callable
-            if args:
-                raise ImproperlyConfigured("Error importing template source loader %s - can't pass arguments to function-based loader." % loader)
-            func = TemplateLoader
-
-        if not func.is_usable:
-            import warnings
-            warnings.warn("Your TEMPLATE_LOADERS setting includes %r, but your Python installation doesn't support that type of template loading. Consider removing that line from TEMPLATE_LOADERS." % loader)
-            return None
-        else:
-            return func
-    else:
-        raise ImproperlyConfigured('Loader does not define a "load_template" callable template source loader')
 
 def find_template(name, dirs=None):
-    # Calculate template_source_loaders the first time the function is executed
-    # because putting this logic in the module-level namespace may cause
-    # circular import errors. See Django ticket #1292.
-    global template_source_loaders
-    if template_source_loaders is None:
-        loaders = []
-        for loader_name in settings.TEMPLATE_LOADERS:
-            loader = find_template_loader(loader_name)
-            if loader is not None:
-                loaders.append(loader)
-        template_source_loaders = tuple(loaders)
-    for loader in template_source_loaders:
-        try:
-            source, display_name = loader(name, dirs)
-            return (source, make_origin(display_name, loader, name, dirs))
-        except TemplateDoesNotExist:
-            pass
-    raise TemplateDoesNotExist(name)
+    return default_engine.find_template(name, dirs)
 
 def get_template(template_name):
     """
