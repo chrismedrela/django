@@ -4,9 +4,12 @@ to load templates from them in order, caching the result.
 """
 
 import hashlib
-from django.template.base import TemplateDoesNotExist
-from django.template.loader import BaseLoader, get_template_from_string, find_template_loader, make_origin
+
+from django.template.base import (TemplateDoesNotExist, find_template_loader,
+    make_origin)
+from django.template.loader import BaseLoader
 from django.utils.encoding import force_bytes
+
 
 class Loader(BaseLoader):
     is_usable = True
@@ -46,14 +49,8 @@ class Loader(BaseLoader):
         if key not in self.template_cache:
             template, origin = self.find_template(template_name, template_dirs)
             if not hasattr(template, 'render'):
-                try:
-                    template = get_template_from_string(template, origin, template_name)
-                except TemplateDoesNotExist:
-                    # If compiling the template we found raises TemplateDoesNotExist,
-                    # back off to returning the source and display name for the template
-                    # we were asked to load. This allows for correct identification (later)
-                    # of the actual template that does not exist.
-                    return template, origin
+                name = origin.name if origin else None
+                return template, name
             self.template_cache[key] = template
         return self.template_cache[key], None
 
