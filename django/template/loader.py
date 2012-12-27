@@ -64,6 +64,54 @@ class BaseLoader(object):
         """
         pass
 
+
+
+def find_template(name, dirs=None):
+    # Calculate template_source_loaders the first time the function is executed
+    # because putting this logic in the module-level namespace may cause
+    # circular import errors. See Django ticket #1292.
+
+
+    global template_source_loaders
+    if template_source_loaders is None:
+        loaders = []
+        for loader_name in settings.TEMPLATE_LOADERS:
+            loader = find_template_loader(loader_name)
+            if loader is not None:
+                loaders.append(loader)
+        template_source_loaders = tuple(loaders)
+    for loader in template_source_loaders:
+        try:
+            source, display_name = loader(name, dirs)
+            return (source, make_origin(display_name, loader, name, dirs))
+        except TemplateDoesNotExist:
+            pass
+    raise TemplateDoesNotExist(name)
+    """
+
+    def _calculate_template_source_loaders(self):
+        loaders = []
+        for loader_name in settings.TEMPLATE_LOADERS:
+            loader = _find_template_loader(loader_name)
+            if loader is not None:
+                loaders.append(loader)
+        self._template_source_loaders = tuple(loaders)
+
+    if default_engine._template_source_loaders is None:
+        _calculate_template_source_loaders(default_engine)
+
+    for loader in default_engine._template_source_loaders:
+        try:
+            source, display_name = loader(name, dirs)
+            return (source, _make_origin(display_name, loader, name, dirs))
+        except TemplateDoesNotExist:
+            pass
+    raise TemplateDoesNotExist(name)
+
+    """
+
+    #return default_engine.find_template(name, dirs)
+
 class LoaderOrigin(Origin):
     def __init__(self, display_name, loader, name, dirs):
         super(LoaderOrigin, self).__init__(display_name)
@@ -72,11 +120,6 @@ class LoaderOrigin(Origin):
     def reload(self):
         return self.loader(self.loadname, self.dirs)[0]
 
-def make_origin(display_name, loader, name, dirs):
-    if settings.TEMPLATE_DEBUG and display_name:
-        return LoaderOrigin(display_name, loader, name, dirs)
-    else:
-        return None
 
 def find_template_loader(loader):
     if isinstance(loader, (tuple, list)):
@@ -111,25 +154,14 @@ def find_template_loader(loader):
     else:
         raise ImproperlyConfigured('Loader does not define a "load_template" callable template source loader')
 
-def find_template(name, dirs=None):
-    # Calculate template_source_loaders the first time the function is executed
-    # because putting this logic in the module-level namespace may cause
-    # circular import errors. See Django ticket #1292.
-    global template_source_loaders
-    if template_source_loaders is None:
-        loaders = []
-        for loader_name in settings.TEMPLATE_LOADERS:
-            loader = find_template_loader(loader_name)
-            if loader is not None:
-                loaders.append(loader)
-        template_source_loaders = tuple(loaders)
-    for loader in template_source_loaders:
-        try:
-            source, display_name = loader(name, dirs)
-            return (source, make_origin(display_name, loader, name, dirs))
-        except TemplateDoesNotExist:
-            pass
-    raise TemplateDoesNotExist(name)
+def make_origin(display_name, loader, name, dirs):
+    if settings.TEMPLATE_DEBUG and display_name:
+        return LoaderOrigin(display_name, loader, name, dirs)
+    else:
+        return None
+
+
+
 
 def get_template(template_name):
     """
@@ -147,6 +179,7 @@ def get_template_from_string(source, origin=None, name=None):
     Returns a compiled Template object for the given template code,
     handling template inheritance recursively.
     """
+    #import ipdb; ipdb.set_trace()
     return Template(source, origin, name)
 
 def render_to_string(template_name, dictionary=None, context_instance=None):

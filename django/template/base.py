@@ -71,6 +71,7 @@ invalid_var_format_string = None
 class TemplateEngine(object):
     def __init__(self):
         self._libraries = {}
+        self._template_source_loaders = None
 
     def get_library(self, library_name):
         lib = self._libraries.get(library_name, None)
@@ -103,9 +104,74 @@ class TemplateEngine(object):
         parser = parser_class(self, lexer.tokenize())
         return parser.parse()
 
+    def find_template(self, name, dirs=None):
+        raise NotImplementedError
+        # OLD COMMENT FIXME
+        # Calculate template_source_loaders the first time the function is
+        # executed because putting this logic in the module-level namespace
+        # may cause circular import errors. See Django ticket #1292.
+        if self._template_source_loaders is None:
+            self._calculate_template_source_loaders()
 
+        for loader in self._template_source_loaders:
+            try:
+                source, display_name = loader(name, dirs)
+                return (source, _make_origin(display_name, loader, name, dirs))
+            except TemplateDoesNotExist:
+                pass
+        raise TemplateDoesNotExist(name)
+
+    def _calculate_template_source_loaders(self):
+        raise NotImplementedError
+        loaders = []
+        for loader_name in settings.TEMPLATE_LOADERS:
+            loader = _find_template_loader(loader_name)
+            if loader is not None:
+                loaders.append(loader)
+        self._template_source_loaders = tuple(loaders)
+
+"""
+def _find_template_loader(loader):
+    if isinstance(loader, (tuple, list)):
+        loader, args = loader[0], loader[1:]
+    else:
+        args = []
+    if isinstance(loader, six.string_types):
+        module, attr = loader.rsplit('.', 1)
+        try:
+            mod = import_module(module)
+        except ImportError as e:
+            raise ImproperlyConfigured('Error importing template source loader %s: "%s"' % (loader, e))
+        try:
+            TemplateLoader = getattr(mod, attr)
+        except AttributeError as e:
+            raise ImproperlyConfigured('Error importing template source loader %s: "%s"' % (loader, e))
+
+        if hasattr(TemplateLoader, 'load_template_source'):
+            func = TemplateLoader(*args)
+        else:
+            # Try loading module the old way - string is full path to callable
+            if args:
+                raise ImproperlyConfigured("Error importing template source loader %s - can't pass arguments to function-based loader." % loader)
+            func = TemplateLoader
+
+        if not func.is_usable:
+            import warnings
+            warnings.warn("Your TEMPLATE_LOADERS setting includes %r, but your Python installation doesn't support that type of template loading. Consider removing that line from TEMPLATE_LOADERS." % loader)
+            return None
+        else:
+            return func
+    else:
+        raise ImproperlyConfigured('Loader does not define a "load_template" callable template source loader')
+
+def _make_origin(display_name, loader, name, dirs):
+    if settings.TEMPLATE_DEBUG and display_name:
+        return LoaderOrigin(display_name, loader, name, dirs)
+    else:
+        return None
+"""
 default_engine = TemplateEngine()
-#default_engine = None
+
 
 
 class TemplateSyntaxError(Exception):
@@ -140,6 +206,16 @@ class Origin(object):
 
     def __str__(self):
         return self.name
+
+"""
+class LoaderOrigin(Origin):
+    def __init__(self, display_name, loader, name, dirs):
+        super(LoaderOrigin, self).__init__(display_name)
+        self.loader, self.loadname, self.dirs = loader, name, dirs
+
+    def reload(self):
+        return self.loader(self.loadname, self.dirs)[0]
+"""
 
 class StringOrigin(Origin):
     def __init__(self, source):
