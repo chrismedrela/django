@@ -379,7 +379,7 @@ class Templates(TestCase):
         # Regression test for #19392
         with self.assertRaisesRegexp(template.TemplateSyntaxError,
                 "The syntax of 'url' changed in Django 1.5, see the docs."):
-            t = _Template(self.engine, '{% url my-view %}')      # not a variable = old syntax
+            t = _Template(self.engine, '{% url my-view %}')
 
     @override_settings(DEBUG=True, TEMPLATE_DEBUG=True)
     def test_no_wrapped_exception(self):
@@ -396,10 +396,9 @@ class Templates(TestCase):
 
     def test_invalid_block_suggestion(self):
         # See #7876
-        from django.template import TemplateSyntaxError
         try:
             t = _Template(self.engine, "{% if 1 %}lala{% endblock %}{% endif %}")
-        except TemplateSyntaxError as e:
+        except template.TemplateSyntaxError as e:
             self.assertEqual(e.args[0], "Invalid block tag: 'endblock', expected 'elif', 'else' or 'endif'")
 
     def test_templates(self):
