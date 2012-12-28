@@ -27,11 +27,10 @@
 
 from django.core.exceptions import ImproperlyConfigured
 from django.template.base import (Origin, Template, Context,
-    TemplateDoesNotExist, add_to_builtins, default_engine)
+    TemplateDoesNotExist, add_to_builtins, default_engine, make_origin)
 from django.utils.importlib import import_module
 from django.conf import settings
 from django.utils import six
-
 
 class BaseLoader(object):
     is_usable = False
@@ -64,60 +63,8 @@ class BaseLoader(object):
         pass
 
 
-
 def find_template(name, dirs=None):
     return default_engine.find_template(name, dirs)
-
-class LoaderOrigin(Origin):
-    def __init__(self, display_name, loader, name, dirs):
-        super(LoaderOrigin, self).__init__(display_name)
-        self.loader, self.loadname, self.dirs = loader, name, dirs
-
-    def reload(self):
-        return self.loader(self.loadname, self.dirs)[0]
-
-
-def find_template_loader(loader):
-    if isinstance(loader, (tuple, list)):
-        loader, args = loader[0], loader[1:]
-    else:
-        args = []
-    if isinstance(loader, six.string_types):
-        module, attr = loader.rsplit('.', 1)
-        try:
-            mod = import_module(module)
-        except ImportError as e:
-            raise ImproperlyConfigured('Error importing template source loader %s: "%s"' % (loader, e))
-        try:
-            TemplateLoader = getattr(mod, attr)
-        except AttributeError as e:
-            raise ImproperlyConfigured('Error importing template source loader %s: "%s"' % (loader, e))
-
-        if hasattr(TemplateLoader, 'load_template_source'):
-            func = TemplateLoader(*args)
-        else:
-            # Try loading module the old way - string is full path to callable
-            if args:
-                raise ImproperlyConfigured("Error importing template source loader %s - can't pass arguments to function-based loader." % loader)
-            func = TemplateLoader
-
-        if not func.is_usable:
-            import warnings
-            warnings.warn("Your TEMPLATE_LOADERS setting includes %r, but your Python installation doesn't support that type of template loading. Consider removing that line from TEMPLATE_LOADERS." % loader)
-            return None
-        else:
-            return func
-    else:
-        raise ImproperlyConfigured('Loader does not define a "load_template" callable template source loader')
-
-def make_origin(display_name, loader, name, dirs):
-    if settings.TEMPLATE_DEBUG and display_name:
-        return LoaderOrigin(display_name, loader, name, dirs)
-    else:
-        return None
-
-
-
 
 def get_template(template_name):
     """
@@ -135,7 +82,6 @@ def get_template_from_string(source, origin=None, name=None):
     Returns a compiled Template object for the given template code,
     handling template inheritance recursively.
     """
-    #import ipdb; ipdb.set_trace()
     return Template(source, origin, name)
 
 def render_to_string(template_name, dictionary=None, context_instance=None):

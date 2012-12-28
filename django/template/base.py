@@ -115,7 +115,7 @@ class TemplateEngine(object):
         for loader in self._template_source_loaders:
             try:
                 source, display_name = loader(name, dirs)
-                return (source, _make_origin(display_name, loader, name, dirs))
+                return (source, make_origin(display_name, loader, name, dirs))
             except TemplateDoesNotExist:
                 pass
         raise TemplateDoesNotExist(name)
@@ -123,13 +123,13 @@ class TemplateEngine(object):
     def _calculate_template_source_loaders(self):
         loaders = []
         for loader_name in settings.TEMPLATE_LOADERS:
-            loader = _find_template_loader(loader_name)
+            loader = find_template_loader(loader_name)
             if loader is not None:
                 loaders.append(loader)
         self._template_source_loaders = tuple(loaders)
 
 
-def _find_template_loader(loader):
+def find_template_loader(loader):
     if isinstance(loader, (tuple, list)):
         loader, args = loader[0], loader[1:]
     else:
@@ -162,7 +162,7 @@ def _find_template_loader(loader):
     else:
         raise ImproperlyConfigured('Loader does not define a "load_template" callable template source loader')
 
-def _make_origin(display_name, loader, name, dirs):
+def make_origin(display_name, loader, name, dirs):
     if settings.TEMPLATE_DEBUG and display_name:
         return LoaderOrigin(display_name, loader, name, dirs)
     else:
