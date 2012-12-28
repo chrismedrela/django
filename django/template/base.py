@@ -105,7 +105,6 @@ class TemplateEngine(object):
         return parser.parse()
 
     def find_template(self, name, dirs=None):
-        raise NotImplementedError
         # OLD COMMENT FIXME
         # Calculate template_source_loaders the first time the function is
         # executed because putting this logic in the module-level namespace
@@ -122,7 +121,6 @@ class TemplateEngine(object):
         raise TemplateDoesNotExist(name)
 
     def _calculate_template_source_loaders(self):
-        raise NotImplementedError
         loaders = []
         for loader_name in settings.TEMPLATE_LOADERS:
             loader = _find_template_loader(loader_name)
@@ -130,7 +128,7 @@ class TemplateEngine(object):
                 loaders.append(loader)
         self._template_source_loaders = tuple(loaders)
 
-"""
+
 def _find_template_loader(loader):
     if isinstance(loader, (tuple, list)):
         loader, args = loader[0], loader[1:]
@@ -169,7 +167,7 @@ def _make_origin(display_name, loader, name, dirs):
         return LoaderOrigin(display_name, loader, name, dirs)
     else:
         return None
-"""
+
 default_engine = TemplateEngine()
 
 
@@ -207,7 +205,6 @@ class Origin(object):
     def __str__(self):
         return self.name
 
-"""
 class LoaderOrigin(Origin):
     def __init__(self, display_name, loader, name, dirs):
         super(LoaderOrigin, self).__init__(display_name)
@@ -215,7 +212,6 @@ class LoaderOrigin(Origin):
 
     def reload(self):
         return self.loader(self.loadname, self.dirs)[0]
-"""
 
 class StringOrigin(Origin):
     def __init__(self, source):

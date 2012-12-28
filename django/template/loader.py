@@ -70,6 +70,9 @@ def find_template(name, dirs=None):
     # because putting this logic in the module-level namespace may cause
     # circular import errors. See Django ticket #1292.
 
+    ## OUR GOAL
+    return default_engine.find_template(name, dirs)
+
     if default_engine._template_source_loaders is None:
         loaders = []
         for loader_name in settings.TEMPLATE_LOADERS:
@@ -86,11 +89,6 @@ def find_template(name, dirs=None):
         except TemplateDoesNotExist:
             pass
     raise TemplateDoesNotExist(name)
-
-    """
-    ## OUR GOAL
-    return default_engine.find_template(name, dirs)
-    """
 
 class LoaderOrigin(Origin):
     def __init__(self, display_name, loader, name, dirs):
