@@ -71,6 +71,8 @@ def find_template(name, dirs=None):
     # because putting this logic in the module-level namespace may cause
     # circular import errors. See Django ticket #1292.
 
+    """
+    ## OLD STATE
 
     global template_source_loaders
     if template_source_loaders is None:
@@ -89,28 +91,28 @@ def find_template(name, dirs=None):
     raise TemplateDoesNotExist(name)
     """
 
-    def _calculate_template_source_loaders(self):
+    global template_source_loaders
+    if template_source_loaders is None:
         loaders = []
         for loader_name in settings.TEMPLATE_LOADERS:
-            loader = _find_template_loader(loader_name)
+            loader = find_template_loader(loader_name)
             if loader is not None:
                 loaders.append(loader)
-        self._template_source_loaders = tuple(loaders)
-
-    if default_engine._template_source_loaders is None:
-        _calculate_template_source_loaders(default_engine)
+        template_source_loaders = tuple(loaders)
+        default_engine._template_source_loaders = template_source_loaders
 
     for loader in default_engine._template_source_loaders:
         try:
             source, display_name = loader(name, dirs)
-            return (source, _make_origin(display_name, loader, name, dirs))
+            return (source, make_origin(display_name, loader, name, dirs))
         except TemplateDoesNotExist:
             pass
     raise TemplateDoesNotExist(name)
 
     """
-
-    #return default_engine.find_template(name, dirs)
+    ## OUR GOAL
+    return default_engine.find_template(name, dirs)
+    """
 
 class LoaderOrigin(Origin):
     def __init__(self, display_name, loader, name, dirs):
