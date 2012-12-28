@@ -32,7 +32,6 @@ from django.utils.importlib import import_module
 from django.conf import settings
 from django.utils import six
 
-template_source_loaders = None
 
 class BaseLoader(object):
     is_usable = False
@@ -71,28 +70,7 @@ def find_template(name, dirs=None):
     # because putting this logic in the module-level namespace may cause
     # circular import errors. See Django ticket #1292.
 
-    """
-    ## OLD STATE
-
-    global template_source_loaders
-    if template_source_loaders is None:
-        loaders = []
-        for loader_name in settings.TEMPLATE_LOADERS:
-            loader = find_template_loader(loader_name)
-            if loader is not None:
-                loaders.append(loader)
-        template_source_loaders = tuple(loaders)
-    for loader in template_source_loaders:
-        try:
-            source, display_name = loader(name, dirs)
-            return (source, make_origin(display_name, loader, name, dirs))
-        except TemplateDoesNotExist:
-            pass
-    raise TemplateDoesNotExist(name)
-    """
-
-    global template_source_loaders
-    if template_source_loaders is None:
+    if default_engine._template_source_loaders is None:
         loaders = []
         for loader_name in settings.TEMPLATE_LOADERS:
             loader = find_template_loader(loader_name)
