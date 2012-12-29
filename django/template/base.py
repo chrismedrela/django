@@ -68,9 +68,11 @@ invalid_var_format_string = None
 
 
 class TemplateEngine(object):
-    def __init__(self):
+    def __init__(self, loaders=None):
         self._libraries = {}
-        self._template_source_loaders = None
+        # If loaders == None then the loaders will be collected basing on
+        # settings module on the first call of self.find_template.
+        self._template_source_loaders = loaders
         # global list of libraries to load by default for a new parser
         self._builtins = []
 
@@ -122,16 +124,40 @@ class TemplateEngine(object):
         return parser.parse()
 
     def find_template(self, name, dirs=None):
+        """ Returns tuple of _Template instance and origin. """
+
         if self._template_source_loaders is None:
             self._template_source_loaders = _calculate_template_source_loaders()
 
         for loader in self._template_source_loaders:
             try:
-                source, display_name = loader(name, dirs)
-                return (source, make_origin(display_name, loader, name, dirs))
+                template, display_name = loader(name, dirs)
             except TemplateDoesNotExist:
                 pass
+            else:
+                origin = make_origin(display_name, loader, name, dirs)
+                if not isinstance(template, _Template):
+                    template = _Template(self, template, origin, name)
+                return template, origin
         raise TemplateDoesNotExist(name)
+
+    def select_template(self, template_names):
+        """ Given a list of template names, returns the first that can be
+        loaded. """
+
+        if not template_names:
+            raise TemplateDoesNotExist("No template names provided")
+        not_found = []
+        for template_name in template_names:
+            try:
+                template, _ = self.find_template(template_name)
+                return template
+            except TemplateDoesNotExist as e:
+                if e.args[0] not in not_found:
+                    not_found.append(e.args[0])
+                continue
+        # If we get here, none of the templates could be loaded
+        raise TemplateDoesNotExist(', '.join(not_found))
 
     def add_to_builtins(self, library):
         if not isinstance(library, Library):
