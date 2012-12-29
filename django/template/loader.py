@@ -26,7 +26,7 @@
 # installed, because pkg_resources is necessary to read eggs.
 
 from django.template.base import (Template, Context,
-    TemplateDoesNotExist, add_to_builtins, default_engine)
+    add_to_builtins, default_engine)
 
 
 class BaseLoader(object):
@@ -67,10 +67,7 @@ def get_template(template_name):
     Returns a compiled Template object for the given template name,
     handling template inheritance recursively.
     """
-    template, origin = find_template(template_name)
-    if not hasattr(template, 'render'):
-        # template needs to be compiled
-        template = get_template_from_string(template, origin, template_name)
+    template, _ = default_engine.find_template(template_name)
     return template
 
 def get_template_from_string(source, origin=None, name=None):
@@ -103,18 +100,6 @@ def render_to_string(template_name, dictionary=None, context_instance=None):
         context_instance.pop()
 
 def select_template(template_name_list):
-    "Given a list of template names, returns the first that can be loaded."
-    if not template_name_list:
-        raise TemplateDoesNotExist("No template names provided")
-    not_found = []
-    for template_name in template_name_list:
-        try:
-            return get_template(template_name)
-        except TemplateDoesNotExist as e:
-            if e.args[0] not in not_found:
-                not_found.append(e.args[0])
-            continue
-    # If we get here, none of the templates could be loaded
-    raise TemplateDoesNotExist(', '.join(not_found))
+    return default_engine.select_template(template_name_list)
 
 add_to_builtins('django.template.loader_tags')
