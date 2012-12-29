@@ -73,10 +73,11 @@ from django.template.base import (compile_string, resolve_variable,
     unescape_string_literal, generic_tag_compiler)
 
 # Library management
-from django.template.base import (Library, add_to_builtins, builtins,
-    get_library, get_templatetags_modules, get_text_list, import_library)
+from django.template.base import (Library, add_to_builtins, get_library,
+    get_templatetags_modules, get_text_list, import_library)
 
 # Engine
-from django.template.base import default_engine, TemplateEngine
+from django.template.base import (default_engine, TemplateEngine,
+    TemplateEngineWithBuiltins)
 
 __all__ = ('Template', 'Context', 'RequestContext', 'compile_string')

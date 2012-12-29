@@ -61,17 +61,18 @@ tag_re = (re.compile('(%s.*?%s|%s.*?%s|%s.*?%s)' %
           (re.escape(BLOCK_TAG_START), re.escape(BLOCK_TAG_END),
            re.escape(VARIABLE_TAG_START), re.escape(VARIABLE_TAG_END),
            re.escape(COMMENT_TAG_START), re.escape(COMMENT_TAG_END))))
-# global list of libraries to load by default for a new parser
-builtins = []
 
 # True if TEMPLATE_STRING_IF_INVALID contains a format string (%s). None means
 # uninitialised.
 invalid_var_format_string = None
 
+
 class TemplateEngine(object):
     def __init__(self):
         self._libraries = {}
         self._template_source_loaders = None
+        # global list of libraries to load by default for a new parser
+        self._builtins = []
 
     def get_library(self, library_name):
         # OLD COMMENT FIXME
@@ -134,6 +135,10 @@ class TemplateEngine(object):
                 pass
         raise TemplateDoesNotExist(name)
 
+    def add_to_builtins(self, library):
+        assert isinstance(library, Library)
+        self._builtins.append(library)
+
     def _calculate_template_source_loaders(self):
         loaders = []
         for loader_name in settings.TEMPLATE_LOADERS:
@@ -141,6 +146,17 @@ class TemplateEngine(object):
             if loader is not None:
                 loaders.append(loader)
         self._template_source_loaders = tuple(loaders)
+
+def TemplateEngineWithBuiltins():
+    engine = TemplateEngine()
+    builtins = [
+        'django.template.defaulttags',
+        'django.template.defaultfilters',
+        'django.template.loader_tags',
+    ]
+    for builtin in builtins:
+        engine.add_to_builtins(import_library(builtin))
+    return engine
 
 
 def find_template_loader(loader):
@@ -183,7 +199,6 @@ def make_origin(display_name, loader, name, dirs):
         return None
 
 default_engine = TemplateEngine()
-
 
 
 class TemplateSyntaxError(Exception):
@@ -355,7 +370,7 @@ class _Parser(object):
         self.tags = {}
         self.filters = {}
         self.engine = engine
-        for lib in builtins:
+        for lib in engine._builtins:
             self.add_library(lib)
 
     def parse(self, parse_until=None):
@@ -1413,7 +1428,7 @@ def get_library(library_name):
     return default_engine.get_library(library_name)
 
 def add_to_builtins(module):
-    builtins.append(import_library(module))
+    default_engine.add_to_builtins(import_library(module))
 
 
 add_to_builtins('django.template.defaulttags')

@@ -161,7 +161,7 @@ class UTF8Class:
 class Templates(TestCase):
 
     def setUp(self):
-        self.engine = template.TemplateEngine()
+        self.engine = template.TemplateEngineWithBuiltins()
 
     def test_loaders_security(self):
         ad_loader = app_directories.Loader()
@@ -1658,7 +1658,7 @@ class TemplateTagLoading(unittest.TestCase):
         self.egg_dir = '%s/eggs' % os.path.dirname(upath(__file__))
         self.old_tag_modules = template_base.templatetags_modules
         template_base.templatetags_modules = []
-        self.engine = template.TemplateEngine()
+        self.engine = template.TemplateEngineWithBuiltins()
 
     def tearDown(self):
         settings.INSTALLED_APPS = self.old_apps
@@ -1697,7 +1697,7 @@ class TemplateTagLoading(unittest.TestCase):
 class RequestContextTests(unittest.TestCase):
 
     def setUp(self):
-        self.engine = template.TemplateEngine()
+        self.engine = template.TemplateEngineWithBuiltins()
         templates = {
             'child': _Template(self.engine, '{{ var|default:"none" }}'),
         }
