@@ -68,9 +68,11 @@ invalid_var_format_string = None
 
 
 class TemplateEngine(object):
-    def __init__(self):
+    def __init__(self, loaders=None):
         self._libraries = {}
-        self._template_source_loaders = None
+        # If loaders == None then the loaders will be collected basing on
+        # settings module on the first call of self.find_template.
+        self._template_source_loaders = loaders
         # global list of libraries to load by default for a new parser
         self._builtins = []
 
@@ -130,10 +132,18 @@ class TemplateEngine(object):
         for loader in self._template_source_loaders:
             try:
                 source, display_name = loader(name, dirs)
-                return (source, make_origin(display_name, loader, name, dirs))
+                origin = make_origin(display_name, loader, name, dirs)
+                return (source, origin)
             except TemplateDoesNotExist:
                 pass
         raise TemplateDoesNotExist(name)
+
+    def find_compiled_template(self, name, dirs=None):
+        template_source, origin = self.find_template(name, dirs)
+        if isinstance(template_source, _Template):
+            return template_source
+        else:
+            return _Template(self, template_source, origin, name)
 
     def add_to_builtins(self, library):
         assert isinstance(library, Library)
@@ -147,8 +157,8 @@ class TemplateEngine(object):
                 loaders.append(loader)
         self._template_source_loaders = tuple(loaders)
 
-def TemplateEngineWithBuiltins():
-    engine = TemplateEngine()
+def TemplateEngineWithBuiltins(*args, **kwargs):
+    engine = TemplateEngine(*args, **kwargs)
     builtins = [
         'django.template.defaulttags',
         'django.template.defaultfilters',

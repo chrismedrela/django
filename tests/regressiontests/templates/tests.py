@@ -1694,30 +1694,37 @@ class TemplateTagLoading(unittest.TestCase):
         t = template._Template(self.engine, ttext)
 
 
+class DictionaryLoader(loader.BaseLoader):
+    "A custom template loader that loads templates from a dictionary."
+
+    def __init__(self, dictionary):
+        super(DictionaryLoader, self).__init__()
+        self.dictionary = dictionary
+
+    def load_template(self, template_name, template_dirs=None):
+        try:
+            return (self.dictionary[template_name], "test:%s" % template_name)
+        except KeyError:
+            raise template.TemplateDoesNotExist(template_name)
+
+
 class RequestContextTests(unittest.TestCase):
+    """
+    Regression test for #15721, ``{% include %}`` and ``RequestContext``
+    not playing together nicely.
+
+    """
 
     def setUp(self):
-        self.engine = template.TemplateEngineWithBuiltins()
-        templates = {
-            'child': _Template(self.engine, '{{ var|default:"none" }}'),
-        }
-        setup_test_template_loader(templates)
+        templates = {}
+        loaders = [DictionaryLoader(templates)]
+        self.engine = template.TemplateEngineWithBuiltins(loaders)
+        templates['child'] = _Template(self.engine, '{{ var|default:"none" }}')
         self.fake_request = RequestFactory().get('/')
 
-    def tearDown(self):
-        restore_template_loaders()
-
-    def test_include_only(self):
-        """
-        Regression test for #15721, ``{% include %}`` and ``RequestContext``
-        not playing together nicely.
-        """
-        ctx = RequestContext(self.fake_request, {'var': 'parent'})
-        self.assertEqual(
-            _Template(self.engine, '{% include "child" %}').render(ctx),
-            'parent'
-        )
-        self.assertEqual(
-            _Template(self.engine, '{% include "child" only %}').render(ctx),
-            'none'
-        )
+    def test(self):
+        context = RequestContext(self.fake_request, {'var': 'parent'})
+        template = _Template(self.engine, '{% include "child" %}')
+        self.assertEqual(template.render(context), 'parent')
+        template = _Template(self.engine, '{% include "child" only %}')
+        self.assertEqual(template.render(context), 'none')

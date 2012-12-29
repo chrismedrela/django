@@ -19,7 +19,6 @@ from django.core.handlers.wsgi import WSGIRequest
 from django.core.signals import got_request_exception
 from django.http import SimpleCookie, HttpRequest, QueryDict
 from django.template import TemplateDoesNotExist
-#import ipdb; ipdb.set_trace()
 from django.test import signals
 from django.utils.functional import curry
 from django.utils.encoding import force_bytes
