@@ -1,9 +1,8 @@
 from collections import defaultdict
 
 from django.conf import settings
-from django.template.base import TemplateSyntaxError, Library, Node, TextNode,\
-    token_kwargs, Variable
-from django.template.loader import get_template
+from django.template.base import (TemplateSyntaxError, Library, Node, TextNode,
+    token_kwargs, Variable)
 from django.utils.safestring import mark_safe
 from django.utils import six
 
@@ -75,9 +74,10 @@ class BlockNode(Node):
 class ExtendsNode(Node):
     must_be_first = True
 
-    def __init__(self, nodelist, parent_name, template_dirs=None):
+    def __init__(self, nodelist, parent_name, engine, template_dirs=None):
         self.nodelist = nodelist
         self.parent_name = parent_name
+        self.engine = engine
         self.template_dirs = template_dirs
         self.blocks = dict([(n.name, n) for n in nodelist.get_nodes_by_type(BlockNode)])
 
@@ -95,7 +95,8 @@ class ExtendsNode(Node):
             raise TemplateSyntaxError(error_msg)
         if hasattr(parent, 'render'):
             return parent # parent is a Template object
-        return get_template(parent)
+        template, _ = self.engine.find_template(parent)
+        return template
 
     def render(self, context):
         compiled_parent = self.get_parent(context)
@@ -140,10 +141,10 @@ class BaseIncludeNode(Node):
 
 class ConstantIncludeNode(BaseIncludeNode):
     def __init__(self, template_path, *args, **kwargs):
+        engine = kwargs.pop('engine')
         super(ConstantIncludeNode, self).__init__(*args, **kwargs)
         try:
-            t = get_template(template_path)
-            self.template = t
+            self.template, _ = engine.find_template(template_path)
         except:
             if settings.TEMPLATE_DEBUG:
                 raise
@@ -156,13 +157,14 @@ class ConstantIncludeNode(BaseIncludeNode):
 
 class IncludeNode(BaseIncludeNode):
     def __init__(self, template_name, *args, **kwargs):
+        self.engine = kwargs.pop('engine')
         super(IncludeNode, self).__init__(*args, **kwargs)
         self.template_name = template_name
 
     def render(self, context):
         try:
             template_name = self.template_name.resolve(context)
-            template = get_template(template_name)
+            template, _ = self.engine.find_template(template_name)
             return self.render_template(template, context)
         except:
             if settings.TEMPLATE_DEBUG:
@@ -215,7 +217,7 @@ def do_extends(parser, token):
     nodelist = parser.parse()
     if nodelist.get_nodes_by_type(ExtendsNode):
         raise TemplateSyntaxError("'%s' cannot appear more than once in the same template" % bits[0])
-    return ExtendsNode(nodelist, parent_name)
+    return ExtendsNode(nodelist, parent_name, parser.engine)
 
 @register.tag('include')
 def do_include(parser, token):
@@ -260,6 +262,7 @@ def do_include(parser, token):
     path = bits[1]
     if path[0] in ('"', "'") and path[-1] == path[0]:
         return ConstantIncludeNode(path[1:-1], extra_context=namemap,
-                                   isolated_context=isolated_context)
+                                   isolated_context=isolated_context,
+                                   engine=parser.engine)
     return IncludeNode(parser.compile_filter(bits[1]), extra_context=namemap,
-                       isolated_context=isolated_context)
+                       isolated_context=isolated_context, engine=parser.engine)
