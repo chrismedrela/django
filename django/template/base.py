@@ -74,6 +74,20 @@ class TemplateEngine(object):
         self._template_source_loaders = None
 
     def get_library(self, library_name):
+        # OLD COMMENT FIXME
+        """
+        Load the template library module with the given name.
+
+        If library is not already loaded loop over all templatetags modules
+        to locate it.
+
+        {% load somelib %} and {% load someotherlib %} loops twice.
+
+        Subsequent loads eg. {% load somelib %} in the same process will grab
+        the cached module from libraries.
+
+        """
+
         lib = self._libraries.get(library_name, None)
         if not lib:
             templatetags_modules = get_templatetags_modules()
@@ -1396,17 +1410,6 @@ def get_templatetags_modules():
     return templatetags_modules
 
 def get_library(library_name):
-    """
-    Load the template library module with the given name.
-
-    If library is not already loaded loop over all templatetags modules
-    to locate it.
-
-    {% load somelib %} and {% load someotherlib %} loops twice.
-
-    Subsequent loads eg. {% load somelib %} in the same process will grab
-    the cached module from libraries.
-    """
     return default_engine.get_library(library_name)
 
 def add_to_builtins(module):
