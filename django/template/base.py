@@ -129,7 +129,7 @@ class TemplateEngine(object):
         # executed because putting this logic in the module-level namespace
         # may cause circular import errors. See Django ticket #1292.
         if self._template_source_loaders is None:
-            self._calculate_template_source_loaders()
+            self._template_source_loaders = _calculate_template_source_loaders()
 
         for loader in self._template_source_loaders:
             try:
@@ -147,14 +147,6 @@ class TemplateEngine(object):
         assert isinstance(library, Library)
         self._builtins.append(library)
 
-    def _calculate_template_source_loaders(self):
-        loaders = []
-        for loader_name in settings.TEMPLATE_LOADERS:
-            loader = find_template_loader(loader_name)
-            if loader is not None:
-                loaders.append(loader)
-        self._template_source_loaders = tuple(loaders)
-
 def TemplateEngineWithBuiltins(*args, **kwargs):
     engine = TemplateEngine(*args, **kwargs)
     builtins = [
@@ -165,7 +157,6 @@ def TemplateEngineWithBuiltins(*args, **kwargs):
     for builtin in builtins:
         engine.add_to_builtins(import_library(builtin))
     return engine
-
 
 def find_template_loader(loader):
     if isinstance(loader, (tuple, list)):
@@ -205,6 +196,14 @@ def make_origin(display_name, loader, name, dirs):
         return LoaderOrigin(display_name, loader, name, dirs)
     else:
         return None
+
+def _calculate_template_source_loaders():
+    loaders = []
+    for loader_name in settings.TEMPLATE_LOADERS:
+        loader = find_template_loader(loader_name)
+        if loader is not None:
+            loaders.append(loader)
+    return tuple(loaders)
 
 default_engine = TemplateEngine()
 
