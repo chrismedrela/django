@@ -71,10 +71,7 @@ def get_template(template_name):
     Returns a compiled Template object for the given template name,
     handling template inheritance recursively.
     """
-    template, origin = find_template(template_name)
-    if not hasattr(template, 'render'):
-        # template needs to be compiled
-        template = get_template_from_string(template, origin, template_name)
+    template, _ = default_engine.find_template(template_name)
     return template
 
 def get_template_from_string(source, origin=None, name=None):
