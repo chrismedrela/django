@@ -124,6 +124,10 @@ class TemplateEngine(object):
     def find_template(self, name, dirs=None):
         """ Returns tuple of _Template instance and origin. """
 
+        # OLD COMMENT FIXME
+        # Calculate template_source_loaders the first time the function is
+        # executed because putting this logic in the module-level namespace
+        # may cause circular import errors. See Django ticket #1292.
         if self._template_source_loaders is None:
             self._calculate_template_source_loaders()
 
@@ -138,30 +142,6 @@ class TemplateEngine(object):
                     template = _Template(self, template, origin, name)
                 return template, origin
         raise TemplateDoesNotExist(name)
-
-    def _find_template(self, name, dirs=None):
-        # OLD COMMENT FIXME
-        # Calculate template_source_loaders the first time the function is
-        # executed because putting this logic in the module-level namespace
-        # may cause circular import errors. See Django ticket #1292.
-        if self._template_source_loaders is None:
-            self._calculate_template_source_loaders()
-
-        for loader in self._template_source_loaders:
-            try:
-                source, display_name = loader(name, dirs)
-                origin = make_origin(display_name, loader, name, dirs)
-                return (source, origin)
-            except TemplateDoesNotExist:
-                pass
-        raise TemplateDoesNotExist(name)
-
-    def find_compiled_template(self, name, dirs=None):
-        template_source, origin = self._find_template(name, dirs)
-        if isinstance(template_source, _Template):
-            return template_source
-        else:
-            return _Template(self, template_source, origin, name)
 
     def add_to_builtins(self, library):
         assert isinstance(library, Library)

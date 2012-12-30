@@ -96,7 +96,8 @@ class ExtendsNode(Node):
             raise TemplateSyntaxError(error_msg)
         if hasattr(parent, 'render'):
             return parent # parent is a Template object
-        return self.engine.find_compiled_template(parent)
+        template, _ = self.engine.find_template(parent)
+        return template
 
     def render(self, context):
         compiled_parent = self.get_parent(context)
@@ -144,8 +145,7 @@ class ConstantIncludeNode(BaseIncludeNode):
         engine = kwargs.pop('engine')
         super(ConstantIncludeNode, self).__init__(*args, **kwargs)
         try:
-            t = engine.find_compiled_template(template_path)
-            self.template = t
+            self.template, _ = engine.find_template(template_path)
         except:
             if settings.TEMPLATE_DEBUG:
                 raise
@@ -165,7 +165,7 @@ class IncludeNode(BaseIncludeNode):
     def render(self, context):
         try:
             template_name = self.template_name.resolve(context)
-            template = self.engine.find_compiled_template(template_name)
+            template, _ = self.engine.find_template(template_name)
             return self.render_template(template, context)
         except:
             if settings.TEMPLATE_DEBUG:
