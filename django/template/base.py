@@ -122,6 +122,24 @@ class TemplateEngine(object):
         return parser.parse()
 
     def find_template(self, name, dirs=None):
+        """ Returns tuple of _Template instance and origin. """
+
+        if self._template_source_loaders is None:
+            self._calculate_template_source_loaders()
+
+        for loader in self._template_source_loaders:
+            try:
+                template, display_name = loader(name, dirs)
+            except TemplateDoesNotExist:
+                pass
+            else:
+                origin = make_origin(display_name, loader, name, dirs)
+                if not isinstance(template, _Template):
+                    template = _Template(self, template, origin, name)
+                return template, origin
+        raise TemplateDoesNotExist(name)
+
+    def _find_template(self, name, dirs=None):
         # OLD COMMENT FIXME
         # Calculate template_source_loaders the first time the function is
         # executed because putting this logic in the module-level namespace
@@ -139,7 +157,7 @@ class TemplateEngine(object):
         raise TemplateDoesNotExist(name)
 
     def find_compiled_template(self, name, dirs=None):
-        template_source, origin = self.find_template(name, dirs)
+        template_source, origin = self._find_template(name, dirs)
         if isinstance(template_source, _Template):
             return template_source
         else:
