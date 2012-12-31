@@ -157,6 +157,19 @@ class UTF8Class:
     def __str__(self):
         return 'ŠĐĆŽćžšđ'
 
+class DictionaryLoader(loader.BaseLoader):
+    "A custom template loader that loads templates from a dictionary."
+
+    def __init__(self, dictionary):
+        super(DictionaryLoader, self).__init__()
+        self.dictionary = dictionary
+
+    def load_template(self, template_name, template_dirs=None):
+        try:
+            return (self.dictionary[template_name], "test:%s" % template_name)
+        except KeyError:
+            raise template.TemplateDoesNotExist(template_name)
+
 @override_settings(MEDIA_URL="/media/", STATIC_URL="/static/")
 class Templates(TestCase):
 
@@ -385,7 +398,6 @@ class Templates(TestCase):
         except template.TemplateSyntaxError as e:
             self.assertEqual(e.args[0], "Invalid block tag: 'endblock', expected 'elif', 'else' or 'endif'")
 
-    @override_settings(TEMPLATE_DEBUG=False)
     def test_templates(self):
 
         def test_template(name, vals):
@@ -483,28 +495,31 @@ class Templates(TestCase):
                 expected_invalid_str = 'INVALID'
                 template_base.invalid_var_format_string = False
 
+        def collect_all_tests(template_tests):
+            filter_tests = filters.get_filter_tests()
 
+            # Quickly check that we aren't accidentally using a name in both
+            # template and filter tests.
+            overlapping_names = [name for name in filter_tests
+                if name in template_tests]
+            assert not overlapping_names, \
+              'Duplicate test name(s): %s' % ', '.join(overlapping_names)
+
+            template_tests.update(filter_tests)
+            tests = sorted(template_tests.items())
+            return tests
+
+        failures = []
         template_tests = self.get_template_tests()
-        filter_tests = filters.get_filter_tests()
-
-        # Quickly check that we aren't accidentally using a name in both
-        # template and filter tests.
-        overlapping_names = [name for name in filter_tests if name in template_tests]
-        assert not overlapping_names, \
-          'Duplicate test name(s): %s' % ', '.join(overlapping_names)
-
-        template_tests.update(filter_tests)
+        tests = collect_all_tests(template_tests)
 
         cache_loader = setup_test_template_loader(
             dict([(name, t[0]) for name, t in six.iteritems(template_tests)]),
             use_cached_loader=True,
         )
 
-        failures = []
-        tests = sorted(template_tests.items())
-
         # Turn TEMPLATE_DEBUG off, because tests assume that.
-        ##old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, False
+        old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, False
 
         # Set TEMPLATE_STRING_IF_INVALID to a known string.
         old_invalid = settings.TEMPLATE_STRING_IF_INVALID
@@ -525,7 +540,7 @@ class Templates(TestCase):
 
         restore_template_loaders()
         deactivate()
-        ##settings.TEMPLATE_DEBUG = old_td
+        settings.TEMPLATE_DEBUG = old_td
         settings.TEMPLATE_STRING_IF_INVALID = old_invalid
         settings.ALLOWED_INCLUDE_ROOTS = old_allowed_include_roots
 
@@ -1719,21 +1734,6 @@ class TemplateTagLoading(unittest.TestCase):
         sys.path.append(egg_name)
         settings.INSTALLED_APPS = ('tagsegg',)
         t = template._Template(self.engine, source)
-
-
-class DictionaryLoader(loader.BaseLoader):
-    "A custom template loader that loads templates from a dictionary."
-
-    def __init__(self, dictionary):
-        super(DictionaryLoader, self).__init__()
-        self.dictionary = dictionary
-
-    def load_template(self, template_name, template_dirs=None):
-        try:
-            return (self.dictionary[template_name], "test:%s" % template_name)
-        except KeyError:
-            raise template.TemplateDoesNotExist(template_name)
-
 
 class RequestContextTests(unittest.TestCase):
     """
