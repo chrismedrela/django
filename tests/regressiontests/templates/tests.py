@@ -387,43 +387,9 @@ class Templates(TestCase):
 
     @override_settings(TEMPLATE_DEBUG=False)
     def test_templates(self):
-        template_tests = self.get_template_tests()
-        filter_tests = filters.get_filter_tests()
 
-        # Quickly check that we aren't accidentally using a name in both
-        # template and filter tests.
-        overlapping_names = [name for name in filter_tests if name in template_tests]
-        assert not overlapping_names, 'Duplicate test name(s): %s' % ', '.join(overlapping_names)
-
-        template_tests.update(filter_tests)
-
-        cache_loader = setup_test_template_loader(
-            dict([(name, t[0]) for name, t in six.iteritems(template_tests)]),
-            use_cached_loader=True,
-        )
-
-        failures = []
-        tests = sorted(template_tests.items())
-
-        # Turn TEMPLATE_DEBUG off, because tests assume that.
-        ##old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, False
-
-        # Set TEMPLATE_STRING_IF_INVALID to a known string.
-        old_invalid = settings.TEMPLATE_STRING_IF_INVALID
-        expected_invalid_str = 'INVALID'
-
-        # Set ALLOWED_INCLUDE_ROOTS so that ssi works.
-        old_allowed_include_roots = settings.ALLOWED_INCLUDE_ROOTS
-        settings.ALLOWED_INCLUDE_ROOTS = (
-            os.path.dirname(os.path.abspath(upath(__file__))),
-        )
-
-        # Warm the URL reversing cache. This ensures we don't pay the cost
-        # warming the cache during one of the tests.
-        urlresolvers.reverse('regressiontests.templates.views.client_action',
-                             kwargs={'id':0,'action':"update"})
-
-        for name, vals in tests:
+        def test_template(name, vals):
+            expected_invalid_str = 'INVALID'
             if isinstance(vals[2], tuple):
                 normal_string_result = vals[2][0]
                 invalid_string_result = vals[2][1]
@@ -516,6 +482,46 @@ class Templates(TestCase):
             if template_base.invalid_var_format_string:
                 expected_invalid_str = 'INVALID'
                 template_base.invalid_var_format_string = False
+
+
+        template_tests = self.get_template_tests()
+        filter_tests = filters.get_filter_tests()
+
+        # Quickly check that we aren't accidentally using a name in both
+        # template and filter tests.
+        overlapping_names = [name for name in filter_tests if name in template_tests]
+        assert not overlapping_names, \
+          'Duplicate test name(s): %s' % ', '.join(overlapping_names)
+
+        template_tests.update(filter_tests)
+
+        cache_loader = setup_test_template_loader(
+            dict([(name, t[0]) for name, t in six.iteritems(template_tests)]),
+            use_cached_loader=True,
+        )
+
+        failures = []
+        tests = sorted(template_tests.items())
+
+        # Turn TEMPLATE_DEBUG off, because tests assume that.
+        ##old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, False
+
+        # Set TEMPLATE_STRING_IF_INVALID to a known string.
+        old_invalid = settings.TEMPLATE_STRING_IF_INVALID
+
+        # Set ALLOWED_INCLUDE_ROOTS so that ssi works.
+        old_allowed_include_roots = settings.ALLOWED_INCLUDE_ROOTS
+        settings.ALLOWED_INCLUDE_ROOTS = (
+            os.path.dirname(os.path.abspath(upath(__file__))),
+        )
+
+        # Warm the URL reversing cache. This ensures we don't pay the cost
+        # warming the cache during one of the tests.
+        urlresolvers.reverse('regressiontests.templates.views.client_action',
+                             kwargs={'id':0,'action':"update"})
+
+        for name, vals in tests:
+            test_template(name, vals)
 
         restore_template_loaders()
         deactivate()
