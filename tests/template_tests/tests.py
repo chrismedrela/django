@@ -62,30 +62,6 @@ except ImportError:
 
 from . import filters
 
-#################################
-# Custom template tag for tests #
-#################################
-
-register = template.Library()
-
-class EchoNode(template.Node):
-    def __init__(self, contents):
-        self.contents = contents
-
-    def render(self, context):
-        return " ".join(self.contents)
-
-def do_echo(parser, token):
-    return EchoNode(token.contents.split()[1:])
-
-def do_upper(value):
-    return value.upper()
-
-register.tag("echo", do_echo)
-register.tag("other_echo", do_echo)
-register.filter("upper", do_upper)
-
-template.default_engine.add_library('testtags', register)
 
 #####################################
 # Helper objects for template tests #
@@ -95,9 +71,6 @@ class SomeException(Exception):
     silent_variable_failure = True
 
 class SomeOtherException(Exception):
-    pass
-
-class ContextStackException(Exception):
     pass
 
 class ShouldNotExecuteException(Exception):
@@ -162,6 +135,19 @@ class UTF8Class:
     "Class whose __str__ returns non-ASCII data on Python 2"
     def __str__(self):
         return 'ŠĐĆŽćžšđ'
+
+class DictionaryLoader(loader.BaseLoader):
+    "A custom template loader that loads templates from a dictionary."
+
+    def __init__(self, dictionary):
+        super(DictionaryLoader, self).__init__()
+        self.dictionary = dictionary
+
+    def load_template(self, template_name, template_dirs=None):
+        try:
+            return (self.dictionary[template_name], "test:%s" % template_name)
+        except KeyError:
+            raise template.TemplateDoesNotExist(template_name)
 
 @override_settings(MEDIA_URL="/media/", STATIC_URL="/static/")
 class Templates(TestCase):
@@ -438,129 +424,202 @@ class Templates(TestCase):
         output = template.render(Context({}))
         self.assertEqual(output, '1st time')
 
+
+class TemplateTestCase(object):
+    def __init__(self, name, vals):
+        self.name = name
+        self.template_source = vals[0]
+        self.expected_invalid_str = 'INVALID'
+        self.invalid_string_result = False
+        if isinstance(vals[2], tuple):
+            self.normal_string_result = vals[2][0]
+            self.invalid_string_result = vals[2][1]
+            if isinstance(self.invalid_string_result, tuple):
+                self.expected_invalid_str = 'INVALID %s'
+                self.invalid_string_result = \
+                  self.invalid_string_result[0] % self.invalid_string_result[1]
+            try:
+                self.template_debug_result = vals[2][2]
+            except IndexError:
+                self.template_debug_result = self.normal_string_result
+
+        else:
+            self.normal_string_result = vals[2]
+            self.invalid_string_result = vals[2]
+            self.template_debug_result = vals[2]
+
+        context = vals[1]
+        if callable(context):
+            self._context = context
+        else:
+            self._context = lambda _: context
+
+    def get_context(self, engine):
+        return template.Context(self._context(engine))
+
+
+@override_settings(MEDIA_URL="/media/", STATIC_URL="/static/")
+class SmallTests(TestCase):
     def test_templates(self):
-        template_tests = self.get_template_tests()
+        tests = self._get_template_and_filter_tests()
+        templates = self._get_templates_from_tests(tests)
+        cache_loader, engine = self._create_cache_loader_and_engine(templates)
+        self._warm_up_URL_reversing_cache() # Don't pay the cost of warming
+                                            # the cache during the tests!
+
+        failures = []
+
+        # Set ALLOWED_INCLUDE_ROOTS so that ssi works.
+        allowed_include_roots = \
+            (os.path.dirname(os.path.abspath(upath(__file__))),)
+        with override_settings(ALLOWED_INCLUDE_ROOTS=allowed_include_roots):
+            for test in tests:
+                new_failures = self._run_test(test, cache_loader, engine)
+                if new_failures:
+                    failures.extend(new_failures)
+
+        deactivate() # just to be on the safe side
+
+        # generate and print raport
+        self._assert_no_failures(failures)
+
+    def _get_template_and_filter_tests(self):
+        template_tests = self._get_template_tests()
         filter_tests = filters.get_filter_tests()
 
         # Quickly check that we aren't accidentally using a name in both
         # template and filter tests.
-        overlapping_names = [name for name in filter_tests if name in template_tests]
-        assert not overlapping_names, 'Duplicate test name(s): %s' % ', '.join(overlapping_names)
+        overlapping_names = set(filter_tests) & set(template_tests)
+        assert not overlapping_names, \
+            'Duplicate test name(s): %s' % ', '.join(overlapping_names)
 
         template_tests.update(filter_tests)
 
-        cache_loader = setup_test_template_loader(
-            dict([(name, t[0]) for name, t in six.iteritems(template_tests)]),
-            use_cached_loader=True,
-        )
-
-        failures = []
+        # Some tests (especially cache-tests) rely on the order of executing
+        # test cases so we need to sort all tests.
         tests = sorted(template_tests.items())
 
-        # Turn TEMPLATE_DEBUG off, because tests assume that.
-        old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, False
+        return [TemplateTestCase(name, vals)
+                for name, vals in tests]
 
-        # Set TEMPLATE_STRING_IF_INVALID to a known string.
-        old_invalid = settings.TEMPLATE_STRING_IF_INVALID
-        expected_invalid_str = 'INVALID'
+    def _get_templates_from_tests(self, tests):
+        return dict([(test.name, test.template_source) for test in tests])
 
-        # Set ALLOWED_INCLUDE_ROOTS so that ssi works.
-        old_allowed_include_roots = settings.ALLOWED_INCLUDE_ROOTS
-        settings.ALLOWED_INCLUDE_ROOTS = (
-            os.path.dirname(os.path.abspath(upath(__file__))),
-        )
+    def _create_cache_loader_and_engine(self, templates):
+        dict_loader = DictionaryLoader(templates)
+        cache_loader = cached.Loader(('fake loader',))
+        cache_loader._cached_loaders = (dict_loader,)
+        engine = template.TemplateEngineWithBuiltins([cache_loader])
+        engine.add_library('testtags', self._get_library_of_custom_template_tags())
+        return cache_loader, engine
 
-        # Warm the URL reversing cache. This ensures we don't pay the cost
-        # warming the cache during one of the tests.
+    def _get_library_of_custom_template_tags(self):
+        """ Return library of custom template tag for tests """
+
+        class EchoNode(template.Node):
+            def __init__(self, contents):
+                self.contents = contents
+
+            def render(self, context):
+                return " ".join(self.contents)
+
+        register = template.Library()
+
+        @register.tag('echo')
+        @register.tag('other_echo')
+        def do_echo(parser, token):
+            return EchoNode(token.contents.split()[1:])
+
+        @register.filter('upper')
+        def do_upper(value):
+            return value.upper()
+
+        return register
+
+    def _warm_up_URL_reversing_cache(self):
         urlresolvers.reverse('template_tests.views.client_action',
                              kwargs={'id':0,'action':"update"})
 
-        for name, vals in tests:
-            if isinstance(vals[2], tuple):
-                normal_string_result = vals[2][0]
-                invalid_string_result = vals[2][1]
+    def _run_test(self, test, cache_loader, engine):
+        failures = []
+        context = test.get_context(engine)
 
-                if isinstance(invalid_string_result, tuple):
-                    expected_invalid_str = 'INVALID %s'
-                    invalid_string_result = invalid_string_result[0] % invalid_string_result[1]
-                    template_base.invalid_var_format_string = True
-
-                try:
-                    template_debug_result = vals[2][2]
-                except IndexError:
-                    template_debug_result = normal_string_result
-
-            else:
-                normal_string_result = vals[2]
-                invalid_string_result = vals[2]
-                template_debug_result = vals[2]
-
-            if 'LANGUAGE_CODE' in vals[1]:
-                activate(vals[1]['LANGUAGE_CODE'])
-            else:
-                activate('en-us')
-
-            for invalid_str, template_debug, result in [
-                    ('', False, normal_string_result),
-                    (expected_invalid_str, False, invalid_string_result),
-                    ('', True, template_debug_result)
-                ]:
-                settings.TEMPLATE_STRING_IF_INVALID = invalid_str
-                settings.TEMPLATE_DEBUG = template_debug
+        template_base.invalid_var_format_string = test.invalid_string_result
+        activate(context.get("LANGUAGE_CODE", 'en-us'))
+        for invalid_str, template_debug, expected_result in [
+            ('', False, test.normal_string_result),
+            (test.expected_invalid_str, False, test.invalid_string_result),
+            ('', True, test.template_debug_result)
+        ]:
+            with override_settings(
+                TEMPLATE_STRING_IF_INVALID=invalid_str,
+                TEMPLATE_DEBUG=template_debug):
                 for is_cached in (False, True):
-                    try:
-                        try:
-                            with warnings.catch_warnings():
-                                # Ignore pending deprecations of the old syntax of the 'cycle' and 'firstof' tags.
-                                warnings.filterwarnings("ignore", category=PendingDeprecationWarning, module='django.template.base')
-                                test_template = loader.get_template(name)
-                        except ShouldNotExecuteException:
-                            failures.append("Template test (Cached='%s', TEMPLATE_STRING_IF_INVALID='%s', TEMPLATE_DEBUG=%s): %s -- FAILED. Template loading invoked method that shouldn't have been invoked." % (is_cached, invalid_str, template_debug, name))
+                    failure_message = self._test_one_case(
+                        engine, test.name, context, expected_result)
 
-                        try:
-                            output = self.render(test_template, vals)
-                        except ShouldNotExecuteException:
-                            failures.append("Template test (Cached='%s', TEMPLATE_STRING_IF_INVALID='%s', TEMPLATE_DEBUG=%s): %s -- FAILED. Template rendering invoked method that shouldn't have been invoked." % (is_cached, invalid_str, template_debug, name))
-                    except ContextStackException:
-                        failures.append("Template test (Cached='%s', TEMPLATE_STRING_IF_INVALID='%s', TEMPLATE_DEBUG=%s): %s -- FAILED. Context stack was left imbalanced" % (is_cached, invalid_str, template_debug, name))
-                        continue
-                    except Exception:
-                        exc_type, exc_value, exc_tb = sys.exc_info()
-                        if exc_type != result:
-                            tb = '\n'.join(traceback.format_exception(exc_type, exc_value, exc_tb))
-                            failures.append("Template test (Cached='%s', TEMPLATE_STRING_IF_INVALID='%s', TEMPLATE_DEBUG=%s): %s -- FAILED. Got %s, exception: %s\n%s" % (is_cached, invalid_str, template_debug, name, exc_type, exc_value, tb))
-                        continue
-                    if output != result:
-                        failures.append("Template test (Cached='%s', TEMPLATE_STRING_IF_INVALID='%s', TEMPLATE_DEBUG=%s): %s -- FAILED. Expected %r, got %r" % (is_cached, invalid_str, template_debug, name, result, output))
-                cache_loader.reset()
+                    if failure_message:
+                        failure_message = \
+                            "Test '%s' failed (cache %s, " \
+                            "invalid_str='%s', debug %s).\n%s" % \
+                            (test.name,
+                             'ON' if is_cached else 'OFF',
+                             invalid_str,
+                             'ON' if template_debug else 'OFF',
+                             failure_message)
+                        failures.append(failure_message)
+            cache_loader.reset()
 
-            if 'LANGUAGE_CODE' in vals[1]:
-                deactivate()
-
-            if template_base.invalid_var_format_string:
-                expected_invalid_str = 'INVALID'
-                template_base.invalid_var_format_string = False
-
-        restore_template_loaders()
         deactivate()
-        settings.TEMPLATE_DEBUG = old_td
-        settings.TEMPLATE_STRING_IF_INVALID = old_invalid
-        settings.ALLOWED_INCLUDE_ROOTS = old_allowed_include_roots
+        template_base.invalid_var_format_string = False
 
-        self.assertEqual(failures, [], "Tests failed:\n%s\n%s" %
-            ('-'*70, ("\n%s\n" % ('-'*70)).join(failures)))
+        return failures
 
-    def render(self, test_template, vals):
-        context = template.Context(vals[1])
-        before_stack_size = len(context.dicts)
-        output = test_template.render(context)
-        if len(context.dicts) != before_stack_size:
-            raise ContextStackException
-        return output
+    def _test_one_case(self, engine, template_name, context, expected_result):
+        try:
+            try:
+                test_template = engine.find_template(template_name)[0]
+            except ShouldNotExecuteException:
+                return ("Template loading invoked method "
+                        "that shouldn't have been invoked.")
+            try:
+                before_stack_size = len(context.dicts)
+                output = test_template.render(context)
+                if len(context.dicts) != before_stack_size:
+                    return "Context stack was left imbalanced"
+            except ShouldNotExecuteException:
+                return ("Template rendering invoked method "
+                        "that shouldn't have been invoked.")
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            if exc_type != expected_result:
+                tb = '\n'.join(traceback.format_exception( \
+                    exc_type, exc_value, exc_tb))
+                return ("Got: %s\nException: %s\n\n%s" % \
+                        (exc_type, exc_value, tb))
+        else:
+            if output != expected_result:
+                return ("Expected: %r\n"
+                        "Got:      %r" % (expected_result, output))
+        return None
 
-    def get_template_tests(self):
-        # SYNTAX --
-        # 'template_name': ('template contents', 'context dict', 'expected string output' or Exception class)
+    def _assert_no_failures(self, failures):
+        separator = ('\n'+'-'*70+'\n')
+        failures_raport = 'Tests failed:\n' + \
+            separator + \
+            separator.join(failures) + \
+            separator
+        self.assertEqual(failures, [], failures_raport)
+
+    def _get_template_tests(self):
+        # Syntax: 'template_name': ('template content', context dict or
+        # function receiving template engine and returning context dict,
+        # 'expected string output' or Exception class or tuple of expected
+        # strings output). The last tuple should contain normal string result
+        # and invalid string result. It may also contain template debug result
+        # (if it's absent then it's the value of normal string
+        # result). Invalid string result may be a string or tuple ('INVALID
+        # %s', 'var').
         basedir = os.path.dirname(os.path.abspath(upath(__file__)))
         tests = {
             ### BASIC SYNTAX ################################################
@@ -1226,10 +1285,10 @@ class Templates(TestCase):
             'inheritance23': ("{% extends 'inheritance20' %}{% block first %}{{ block.super }}b{% endblock %}", {}, '1&ab3_'),
 
             # Inheritance from local context without use of template loader
-            'inheritance24': ("{% extends context_template %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", {'context_template': template._Template(self.engine, "1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")}, '1234'),
+            'inheritance24': ("{% extends context_template %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", lambda engine: {'context_template': template._Template(engine, "1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")}, '1234'),
 
             # Inheritance from local context with variable parent template
-            'inheritance25': ("{% extends context_template.1 %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", {'context_template': [template._Template(self.engine, "Wrong"), template._Template(self.engine, "1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")]}, '1234'),
+            'inheritance25': ("{% extends context_template.1 %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", lambda engine: {'context_template': [template._Template(engine, "Wrong"), template._Template(engine, "1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")]}, '1234'),
 
             # Set up a base template to extend
             'inheritance26': ("no tags", {}, 'no tags'),
@@ -1783,21 +1842,6 @@ class TemplateTagLoading(unittest.TestCase):
         sys.path.append(egg_name)
         settings.INSTALLED_APPS = ('tagsegg',)
         t = template._Template(self.engine, source)
-
-
-class DictionaryLoader(loader.BaseLoader):
-    "A custom template loader that loads templates from a dictionary."
-
-    def __init__(self, dictionary):
-        super(DictionaryLoader, self).__init__()
-        self.dictionary = dictionary
-
-    def load_template(self, template_name, template_dirs=None):
-        try:
-            return (self.dictionary[template_name], "test:%s" % template_name)
-        except KeyError:
-            raise template.TemplateDoesNotExist(template_name)
-
 
 class RequestContextTests(unittest.TestCase):
     """
