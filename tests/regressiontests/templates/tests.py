@@ -385,6 +385,7 @@ class Templates(TestCase):
         except template.TemplateSyntaxError as e:
             self.assertEqual(e.args[0], "Invalid block tag: 'endblock', expected 'elif', 'else' or 'endif'")
 
+    @override_settings(TEMPLATE_DEBUG=False)
     def test_templates(self):
         template_tests = self.get_template_tests()
         filter_tests = filters.get_filter_tests()
@@ -405,7 +406,7 @@ class Templates(TestCase):
         tests = sorted(template_tests.items())
 
         # Turn TEMPLATE_DEBUG off, because tests assume that.
-        old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, False
+        ##old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, False
 
         # Set TEMPLATE_STRING_IF_INVALID to a known string.
         old_invalid = settings.TEMPLATE_STRING_IF_INVALID
@@ -429,7 +430,8 @@ class Templates(TestCase):
 
                 if isinstance(invalid_string_result, tuple):
                     expected_invalid_str = 'INVALID %s'
-                    invalid_string_result = invalid_string_result[0] % invalid_string_result[1]
+                    invalid_string_result = \
+                      invalid_string_result[0] % invalid_string_result[1]
                     template_base.invalid_var_format_string = True
 
                 try:
@@ -459,23 +461,53 @@ class Templates(TestCase):
                         try:
                             test_template = loader.get_template(name)
                         except ShouldNotExecuteException:
-                            failures.append("Template test (Cached='%s', TEMPLATE_STRING_IF_INVALID='%s', TEMPLATE_DEBUG=%s): %s -- FAILED. Template loading invoked method that shouldn't have been invoked." % (is_cached, invalid_str, template_debug, name))
+                            failures.append(
+                                "Template test (Cached='%s', "
+                                "TEMPLATE_STRING_IF_INVALID='%s', "
+                                "TEMPLATE_DEBUG=%s): %s -- FAILED. "
+                                "Template loading invoked method "
+                                "that shouldn't have been invoked." % \
+                                (is_cached, invalid_str, template_debug, name))
 
                         try:
                             output = self.render(test_template, vals)
                         except ShouldNotExecuteException:
-                            failures.append("Template test (Cached='%s', TEMPLATE_STRING_IF_INVALID='%s', TEMPLATE_DEBUG=%s): %s -- FAILED. Template rendering invoked method that shouldn't have been invoked." % (is_cached, invalid_str, template_debug, name))
+                            failures.append(
+                                "Template test (Cached='%s', "
+                                "TEMPLATE_STRING_IF_INVALID='%s', "
+                                "TEMPLATE_DEBUG=%s): %s -- FAILED. "
+                                "Template rendering invoked method "
+                                "that shouldn't have been invoked." % \
+                                (is_cached, invalid_str, template_debug, name))
                     except ContextStackException:
-                        failures.append("Template test (Cached='%s', TEMPLATE_STRING_IF_INVALID='%s', TEMPLATE_DEBUG=%s): %s -- FAILED. Context stack was left imbalanced" % (is_cached, invalid_str, template_debug, name))
+                        failures.append(
+                            "Template test (Cached='%s', "
+                            "TEMPLATE_STRING_IF_INVALID='%s', "
+                            "TEMPLATE_DEBUG=%s): %s -- FAILED. "
+                            "Context stack was left imbalanced" % \
+                            (is_cached, invalid_str, template_debug, name))
                         continue
                     except Exception:
                         exc_type, exc_value, exc_tb = sys.exc_info()
                         if exc_type != result:
-                            tb = '\n'.join(traceback.format_exception(exc_type, exc_value, exc_tb))
-                            failures.append("Template test (Cached='%s', TEMPLATE_STRING_IF_INVALID='%s', TEMPLATE_DEBUG=%s): %s -- FAILED. Got %s, exception: %s\n%s" % (is_cached, invalid_str, template_debug, name, exc_type, exc_value, tb))
+                            tb = '\n'.join(traceback.format_exception( \
+                                exc_type, exc_value, exc_tb))
+                            failures.append(
+                                "Template test (Cached='%s', "
+                                "TEMPLATE_STRING_IF_INVALID='%s', "
+                                "TEMPLATE_DEBUG=%s): %s -- FAILED. "
+                                "Got %s, exception: %s\n%s" % \
+                                (is_cached, invalid_str, template_debug,
+                                 name, exc_type, exc_value, tb))
                         continue
                     if output != result:
-                        failures.append("Template test (Cached='%s', TEMPLATE_STRING_IF_INVALID='%s', TEMPLATE_DEBUG=%s): %s -- FAILED. Expected %r, got %r" % (is_cached, invalid_str, template_debug, name, result, output))
+                        failures.append(
+                            "Template test (Cached='%s', "
+                            "TEMPLATE_STRING_IF_INVALID='%s', "
+                            "TEMPLATE_DEBUG=%s): %s -- FAILED. "
+                            "Expected %r, got %r" % \
+                            (is_cached, invalid_str, template_debug,
+                             name, result, output))
                 cache_loader.reset()
 
             if 'LANGUAGE_CODE' in vals[1]:
@@ -487,7 +519,7 @@ class Templates(TestCase):
 
         restore_template_loaders()
         deactivate()
-        settings.TEMPLATE_DEBUG = old_td
+        ##settings.TEMPLATE_DEBUG = old_td
         settings.TEMPLATE_STRING_IF_INVALID = old_invalid
         settings.ALLOWED_INCLUDE_ROOTS = old_allowed_include_roots
 
