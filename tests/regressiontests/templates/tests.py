@@ -303,40 +303,39 @@ class Templates(TestCase):
             self.fail('Template rendering unexpectedly succeeded, '
                       'produced: ->%result<-' % result)
 
+    @override_settings(TEMPLATE_DEBUG=True)
     def test_extends_include_missing_cachedloader(self):
         """
         Same as test_extends_include_missing_baseloader, only tests
         behavior of the cached loader instead of BaseLoader.
+
         """
 
-        old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, True
-        old_loaders = default_engine._template_source_loaders
+        cache_loader = cached.Loader(('',))
+        cache_loader._cached_loaders = (app_directories.Loader(),)
+        engine = template.TemplateEngineWithBuiltins((cache_loader,))
 
+        load_name = 'test_extends_error.html'
+        tmpl = engine.find_template(load_name)[0]
         try:
-            cache_loader = cached.Loader(('',))
-            cache_loader._cached_loaders = (app_directories.Loader(),)
-            default_engine._template_source_loaders = (cache_loader,)
+            result = tmpl.render(template.Context({}))
+        except template.TemplateDoesNotExist as e:
+            self.assertEqual(e.args[0], 'missing.html')
+        else:
+            self.fail('Template rendering unexpectedly succeeded, '
+                      'produced: ->%result<-' % result)
 
-            load_name = 'test_extends_error.html'
-            tmpl = loader.get_template(load_name)
-            r = None
-            try:
-                r = tmpl.render(template.Context({}))
-            except template.TemplateDoesNotExist as e:
-                self.assertEqual(e.args[0], 'missing.html')
-            self.assertEqual(r, None, 'Template rendering unexpectedly succeeded, produced: ->%r<-' % r)
-
-            # For the cached loader, repeat the test, to ensure the first attempt did not cache a
-            # result that behaves incorrectly on subsequent attempts.
-            tmpl = loader.get_template(load_name)
-            try:
-                tmpl.render(template.Context({}))
-            except template.TemplateDoesNotExist as e:
-                self.assertEqual(e.args[0], 'missing.html')
-            self.assertEqual(r, None, 'Template rendering unexpectedly succeeded, produced: ->%r<-' % r)
-        finally:
-            default_engine._template_source_loaders = old_loaders
-            settings.TEMPLATE_DEBUG = old_td
+        # For the cached loader, repeat the test, to ensure the first attempt
+        # did not cache a result that behaves incorrectly on subsequent
+        # attempts.
+        tmpl = engine.find_template(load_name)[0]
+        try:
+            tmpl.render(template.Context({}))
+        except template.TemplateDoesNotExist as e:
+            self.assertEqual(e.args[0], 'missing.html')
+        else:
+            self.fail('Template rendering unexpectedly succeeded, '
+                      'produced: ->%result<-' % result)
 
     def test_token_smart_split(self):
         # Regression test for #7027
