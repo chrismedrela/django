@@ -216,43 +216,41 @@ class Templates(TestCase):
             test_template_sources('/DIR1/index.HTML', template_dirs,
                                   ['/DIR1/index.HTML'])
 
+    # Turn TEMPLATE_DEBUG on, so that the origin file name will be kept with
+    # the compiled templates.
+    @override_settings(TEMPLATE_DEBUG=True)
     def test_loader_debug_origin(self):
-        # Turn TEMPLATE_DEBUG on, so that the origin file name will be kept with
-        # the compiled templates.
-        old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, True
-        old_loaders = default_engine._template_source_loaders
+        loaders = (filesystem.Loader(),)
+        engine = template.TemplateEngineWithBuiltins(loaders)
 
-        try:
-            default_engine._template_source_loaders = (filesystem.Loader(),)
+        # We rely on the fact that runtests.py sets up TEMPLATE_DIRS to
+        # point to a directory containing a login.html file. Also that
+        # the file system and app directories loaders both inherit the
+        # load_template method from the BaseLoader class, so we only need
+        # to test one of them.
+        load_name = 'login.html'
+        tmpl = engine.find_template(load_name)[0]
+        template_name = tmpl.nodelist[0].source[0].name
+        self.assertTrue(template_name.endswith(load_name),
+            'Template loaded by filesystem loader has incorrect name '
+            'for debug page: %s' % template_name)
 
-            # We rely on the fact that runtests.py sets up TEMPLATE_DIRS to
-            # point to a directory containing a login.html file. Also that
-            # the file system and app directories loaders both inherit the
-            # load_template method from the BaseLoader class, so we only need
-            # to test one of them.
-            load_name = 'login.html'
-            template = loader.get_template(load_name)
-            template_name = template.nodelist[0].source[0].name
-            self.assertTrue(template_name.endswith(load_name),
-                'Template loaded by filesystem loader has incorrect name for debug page: %s' % template_name)
+        # Also test the cached loader, since it overrides load_template
+        cache_loader = cached.Loader(('',))
+        cache_loader._cached_loaders = engine._template_source_loaders
+        engine._template_source_loaders = (cache_loader,)
 
-            # Also test the cached loader, since it overrides load_template
-            cache_loader = cached.Loader(('',))
-            cache_loader._cached_loaders = default_engine._template_source_loaders
-            default_engine._template_source_loaders = (cache_loader,)
+        tmpl = engine.find_template(load_name)[0]
+        template_name = tmpl.nodelist[0].source[0].name
+        self.assertTrue(template_name.endswith(load_name),
+            'Template loaded through cached loader has incorrect name '
+            'for debug page: %s' % template_name)
 
-            template = loader.get_template(load_name)
-            template_name = template.nodelist[0].source[0].name
-            self.assertTrue(template_name.endswith(load_name),
-                'Template loaded through cached loader has incorrect name for debug page: %s' % template_name)
-
-            template = loader.get_template(load_name)
-            template_name = template.nodelist[0].source[0].name
-            self.assertTrue(template_name.endswith(load_name),
-                'Cached template loaded through cached loader has incorrect name for debug page: %s' % template_name)
-        finally:
-            default_engine._template_source_loaders = old_loaders
-            settings.TEMPLATE_DEBUG = old_td
+        tmpl = engine.find_template(load_name)[0]
+        template_name = tmpl.nodelist[0].source[0].name
+        self.assertTrue(template_name.endswith(load_name),
+            'Cached tmpl loaded through cached loader '
+            'has incorrect name for debug page: %s' % template_name)
 
     # TEMPLATE_DEBUG must be true, otherwise the exception raised during
     # {% include %} processing will be suppressed.
