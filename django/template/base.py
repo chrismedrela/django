@@ -143,6 +143,24 @@ class TemplateEngine(object):
                 return template, origin
         raise TemplateDoesNotExist(name)
 
+    def select_template(self, template_names):
+        """ Given a list of template names, returns the first that can be
+        loaded. """
+
+        if not template_names:
+            raise TemplateDoesNotExist("No template names provided")
+        not_found = []
+        for template_name in template_names:
+            try:
+                template, _ = self.find_template(template_name)
+                return template
+            except TemplateDoesNotExist as e:
+                if e.args[0] not in not_found:
+                    not_found.append(e.args[0])
+                continue
+        # If we get here, none of the templates could be loaded
+        raise TemplateDoesNotExist(', '.join(not_found))
+
     def add_to_builtins(self, library):
         assert isinstance(library, Library)
         self._builtins.append(library)
