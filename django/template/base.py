@@ -5,6 +5,7 @@ from functools import partial
 from inspect import getargspec
 
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 from django.template.context import (Context, RequestContext,
     ContextPopException)
 from django.utils.importlib import import_module
