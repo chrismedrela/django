@@ -1666,32 +1666,36 @@ class TemplateTagLoading(unittest.TestCase):
         template_base.templatetags_modules = self.old_tag_modules
 
     def test_load_error(self):
-        ttext = "{% load broken_tag %}"
-        self.assertRaises(template.TemplateSyntaxError, template.Template, ttext)
+        source = "{% load broken_tag %}"
+        self.assertRaises(template.TemplateSyntaxError,
+                          template._Template,
+                          self.engine, source)
         try:
-            template._Template(self.engine, ttext)
+            template._Template(self.engine, source)
         except template.TemplateSyntaxError as e:
             self.assertTrue('ImportError' in e.args[0])
             self.assertTrue('Xtemplate' in e.args[0])
 
     def test_load_error_egg(self):
-        ttext = "{% load broken_egg %}"
+        source = "{% load broken_egg %}"
         egg_name = '%s/tagsegg.egg' % self.egg_dir
         sys.path.append(egg_name)
         settings.INSTALLED_APPS = ('tagsegg',)
-        self.assertRaises(template.TemplateSyntaxError, template.Template, ttext)
+        self.assertRaises(template.TemplateSyntaxError,
+                          template._Template,
+                          self.engine, source)
         try:
-            template._Template(self.engine, ttext)
+            template._Template(self.engine, source)
         except template.TemplateSyntaxError as e:
             self.assertTrue('ImportError' in e.args[0])
             self.assertTrue('Xtemplate' in e.args[0])
 
     def test_load_working_egg(self):
-        ttext = "{% load working_egg %}"
+        source = "{% load working_egg %}"
         egg_name = '%s/tagsegg.egg' % self.egg_dir
         sys.path.append(egg_name)
         settings.INSTALLED_APPS = ('tagsegg',)
-        t = template._Template(self.engine, ttext)
+        t = template._Template(self.engine, source)
 
 
 class DictionaryLoader(loader.BaseLoader):
