@@ -254,36 +254,30 @@ class Templates(TestCase):
             default_engine._template_source_loaders = old_loaders
             settings.TEMPLATE_DEBUG = old_td
 
+    # TEMPLATE_DEBUG must be true, otherwise the exception raised during
+    # {% include %} processing will be suppressed.
+    @override_settings(TEMPLATE_DEBUG=True)
     def test_include_missing_template(self):
         """
         Tests that the correct template is identified as not existing
         when {% include %} specifies a template that does not exist.
+
         """
 
-        # TEMPLATE_DEBUG must be true, otherwise the exception raised
-        # during {% include %} processing will be suppressed.
-        old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, True
-        old_loaders = default_engine._template_source_loaders
-
+        # Test the base loader class via the app loader. load_template
+        # from base is used by all shipped loaders excepting cached,
+        # which has its own test.
+        loaders = (app_directories.Loader(),)
+        engine = template.TemplateEngineWithBuiltins(loaders)
+        template_names = ['test_include_error.html']
         try:
-            # Test the base loader class via the app loader. load_template
-            # from base is used by all shipped loaders excepting cached,
-            # which has its own test.
-            default_engine._template_source_loaders = (app_directories.Loader(),)
-
-            load_name = 'test_include_error.html'
-            r = None
-            try:
-                tmpl = loader.select_template([load_name])
-                r = tmpl.render(template.Context({}))
-            except template.TemplateDoesNotExist as e:
-                settings.TEMPLATE_DEBUG = old_td
-                self.assertEqual(e.args[0], 'missing.html')
-            self.assertEqual(r, None, 'Template rendering unexpectedly succeeded, produced: ->%r<-' % r)
-        finally:
-            default_engine._template_source_loaders = old_loaders
-            settings.TEMPLATE_DEBUG = old_td
-
+            tmpl = engine.select_template(template_names)
+            result = tmpl.render(template.Context({}))
+        except template.TemplateDoesNotExist as e:
+            self.assertEqual(e.args[0], 'missing.html')
+        else:
+            self.fail('Template rendering unexpectedly succeeded, '
+                      'produced: ->%result<-' % result)
 
     def test_extends_include_missing_baseloader(self):
         """
