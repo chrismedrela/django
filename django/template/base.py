@@ -165,6 +165,9 @@ class TemplateEngine(object):
         assert isinstance(library, Library)
         self._builtins.append(library)
 
+    def get_template_source_loaders(self):
+        return self._template_source_loaders
+
 def TemplateEngineWithBuiltins(*args, **kwargs):
     engine = TemplateEngine(*args, **kwargs)
     builtins = [
