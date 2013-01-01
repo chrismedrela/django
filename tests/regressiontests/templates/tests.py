@@ -486,11 +486,12 @@ class Templates(TestCase):
                     (expected_invalid_str, False, invalid_string_result),
                     ('', True, template_debug_result)
                 ]:
-                settings.TEMPLATE_STRING_IF_INVALID = invalid_str
-                settings.TEMPLATE_DEBUG = template_debug
-                for is_cached in (False, True):
-                    test_one_case(name, is_cached,
-                                  invalid_str, template_debug, result)
+                with override_settings(
+                    TEMPLATE_STRING_IF_INVALID=invalid_str,
+                    TEMPLATE_DEBUG=template_debug):
+                    for is_cached in (False, True):
+                        test_one_case(name, is_cached,
+                                      invalid_str, template_debug, result)
                 cache_loader.reset()
 
             if 'LANGUAGE_CODE' in vals[1]:
@@ -523,31 +524,27 @@ class Templates(TestCase):
             use_cached_loader=True,
         )
 
-        # Turn TEMPLATE_DEBUG off, because tests assume that.
-        old_td, settings.TEMPLATE_DEBUG = settings.TEMPLATE_DEBUG, False
-
-        # Set TEMPLATE_STRING_IF_INVALID to a known string.
+        old_td = settings.TEMPLATE_DEBUG
         old_invalid = settings.TEMPLATE_STRING_IF_INVALID
-
-        # Set ALLOWED_INCLUDE_ROOTS so that ssi works.
         old_allowed_include_roots = settings.ALLOWED_INCLUDE_ROOTS
-        settings.ALLOWED_INCLUDE_ROOTS = (
-            os.path.dirname(os.path.abspath(upath(__file__))),
-        )
 
         # Warm the URL reversing cache. This ensures we don't pay the cost
         # warming the cache during one of the tests.
         urlresolvers.reverse('regressiontests.templates.views.client_action',
                              kwargs={'id':0,'action':"update"})
 
-        for name, vals in tests:
-            test_template(name, vals)
+        # Set ALLOWED_INCLUDE_ROOTS so that ssi works.
+        allowed_include_roots = \
+            (os.path.dirname(os.path.abspath(upath(__file__))),)
+        with override_settings(ALLOWED_INCLUDE_ROOTS=allowed_include_roots):
+            for name, vals in tests:
+                test_template(name, vals)
 
         restore_template_loaders()
         deactivate()
-        settings.TEMPLATE_DEBUG = old_td
-        settings.TEMPLATE_STRING_IF_INVALID = old_invalid
-        settings.ALLOWED_INCLUDE_ROOTS = old_allowed_include_roots
+        assert settings.TEMPLATE_DEBUG == old_td
+        assert settings.TEMPLATE_STRING_IF_INVALID == old_invalid
+        assert settings.ALLOWED_INCLUDE_ROOTS == old_allowed_include_roots
 
         self.assertEqual(failures, [], "Tests failed:\n%s\n%s" %
             ('-'*70, ("\n%s\n" % ('-'*70)).join(failures)))
