@@ -501,26 +501,25 @@ class Templates(TestCase):
                 expected_invalid_str = 'INVALID'
                 template_base.invalid_var_format_string = False
 
-        def collect_all_tests(template_tests):
+        def collect_all_tests():
+            template_tests = self.get_template_tests()
             filter_tests = filters.get_filter_tests()
 
             # Quickly check that we aren't accidentally using a name in both
             # template and filter tests.
-            overlapping_names = [name for name in filter_tests
-                if name in template_tests]
+            overlapping_names = set(filter_tests) & set(template_tests)
             assert not overlapping_names, \
-              'Duplicate test name(s): %s' % ', '.join(overlapping_names)
+                'Duplicate test name(s): %s' % ', '.join(overlapping_names)
 
             template_tests.update(filter_tests)
             tests = sorted(template_tests.items())
             return tests
 
         failures = []
-        template_tests = self.get_template_tests()
-        tests = collect_all_tests(template_tests)
+        tests = collect_all_tests()
 
         cache_loader = setup_test_template_loader(
-            dict([(name, t[0]) for name, t in six.iteritems(template_tests)]),
+            dict([(name, t[0]) for name, t in tests]),
             use_cached_loader=True,
         )
 
@@ -558,8 +557,8 @@ class Templates(TestCase):
         return output
 
     def get_template_tests(self):
-        # SYNTAX --
-        # 'template_name': ('template contents', 'context dict', 'expected string output' or Exception class)
+        # SYNTAX: 'template_name': ('template contents', 'context dict',
+        # 'expected string output' or Exception class)
         basedir = os.path.dirname(os.path.abspath(upath(__file__)))
         tests = {
             ### BASIC SYNTAX ################################################
