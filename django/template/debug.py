@@ -1,4 +1,4 @@
-from django.template.base import Lexer, _Parser, tag_re, NodeList, VariableNode, TemplateSyntaxError
+from django.template.base import Lexer, Parser, tag_re, NodeList, VariableNode, TemplateSyntaxError
 from django.utils.encoding import force_text
 from django.utils.html import escape
 from django.utils.safestring import SafeData, EscapeData
@@ -30,7 +30,7 @@ class DebugLexer(Lexer):
         token.source = self.origin, source
         return token
 
-class DebugParser(_Parser):
+class DebugParser(Parser):
     def __init__(self, *args, **kwargs):
         super(DebugParser, self).__init__(*args, **kwargs)
         self.command_stack = []

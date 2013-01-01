@@ -116,7 +116,7 @@ class TemplateEngine(object):
             from django.template.debug import DebugLexer, DebugParser
             lexer_class, parser_class = DebugLexer, DebugParser
         else:
-            lexer_class, parser_class = Lexer, _Parser
+            lexer_class, parser_class = Lexer, Parser
         lexer = lexer_class(template_string, origin)
         parser = parser_class(self, lexer.tokenize())
         return parser.parse()
@@ -389,7 +389,7 @@ class Lexer(object):
         self.lineno += token_string.count('\n')
         return token
 
-class _Parser(object):
+class Parser(object):
     def __init__(self, engine, tokens):
         self.tokens = tokens
         self.tags = {}
@@ -517,9 +517,6 @@ class _Parser(object):
             return self.filters[filter_name]
         else:
             raise TemplateSyntaxError("Invalid filter: '%s'" % filter_name)
-
-def Parser(*args, **kwargs):
-    return _Parser(default_engine, *args, **kwargs)
 
 
 class TokenParser(object):
