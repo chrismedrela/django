@@ -518,10 +518,17 @@ class Templates(TestCase):
         failures = []
         tests = collect_all_tests()
 
-        cache_loader = setup_test_template_loader(
-            dict([(name, t[0]) for name, t in tests]),
-            use_cached_loader=True,
-        )
+
+        #cache_loader = setup_test_template_loader(
+        #    dict([(name, t[0]) for name, t in tests]),
+        #    use_cached_loader=True,
+        #)
+        templates = dict([(name, t[0]) for name, t in tests])
+        dict_loader = DictionaryLoader(templates)
+        cache_loader = cached.Loader(('blb',))
+        cache_loader._cached_loaders = (dict_loader,)
+        old_template_source_loaders = default_engine._template_source_loaders
+        default_engine._template_source_loaders = (cache_loader,)
 
         old_td = settings.TEMPLATE_DEBUG
         old_invalid = settings.TEMPLATE_STRING_IF_INVALID
@@ -539,7 +546,8 @@ class Templates(TestCase):
             for name, vals in tests:
                 test_template(name, vals)
 
-        restore_template_loaders()
+        #restore_template_loaders()
+        default_engine._template_source_loaders = old_template_source_loaders
         deactivate()
         assert settings.TEMPLATE_DEBUG == old_td
         assert settings.TEMPLATE_STRING_IF_INVALID == old_invalid
