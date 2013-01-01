@@ -404,7 +404,7 @@ class Templates(TestCase):
                           invalid_str, template_debug, result):
             try:
                 try:
-                    test_template = loader.get_template(name)
+                    test_template = engine.find_template(name)[0]
                 except ShouldNotExecuteException:
                     failures.append(
                         "Template test (Cached='%s', "
@@ -515,20 +515,15 @@ class Templates(TestCase):
             tests = sorted(template_tests.items())
             return tests
 
-        failures = []
         tests = collect_all_tests()
 
-
-        #cache_loader = setup_test_template_loader(
-        #    dict([(name, t[0]) for name, t in tests]),
-        #    use_cached_loader=True,
-        #)
         templates = dict([(name, t[0]) for name, t in tests])
         dict_loader = DictionaryLoader(templates)
         cache_loader = cached.Loader(('blb',))
         cache_loader._cached_loaders = (dict_loader,)
         old_template_source_loaders = default_engine._template_source_loaders
         default_engine._template_source_loaders = (cache_loader,)
+        engine = default_engine
 
         old_td = settings.TEMPLATE_DEBUG
         old_invalid = settings.TEMPLATE_STRING_IF_INVALID
@@ -539,6 +534,8 @@ class Templates(TestCase):
         urlresolvers.reverse('regressiontests.templates.views.client_action',
                              kwargs={'id':0,'action':"update"})
 
+        failures = []
+
         # Set ALLOWED_INCLUDE_ROOTS so that ssi works.
         allowed_include_roots = \
             (os.path.dirname(os.path.abspath(upath(__file__))),)
@@ -546,7 +543,6 @@ class Templates(TestCase):
             for name, vals in tests:
                 test_template(name, vals)
 
-        #restore_template_loaders()
         default_engine._template_source_loaders = old_template_source_loaders
         deactivate()
         assert settings.TEMPLATE_DEBUG == old_td
