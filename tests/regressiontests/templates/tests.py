@@ -400,6 +400,60 @@ class Templates(TestCase):
 
     def test_templates(self):
 
+        def test_one_case(name, is_cached,
+                          invalid_str, template_debug, result):
+            try:
+                try:
+                    test_template = loader.get_template(name)
+                except ShouldNotExecuteException:
+                    failures.append(
+                        "Template test (Cached='%s', "
+                        "TEMPLATE_STRING_IF_INVALID='%s', "
+                        "TEMPLATE_DEBUG=%s): %s -- FAILED. "
+                        "Template loading invoked method "
+                        "that shouldn't have been invoked." % \
+                        (is_cached, invalid_str, template_debug, name))
+
+                try:
+                    output = self.render(test_template, vals)
+                except ShouldNotExecuteException:
+                    failures.append(
+                        "Template test (Cached='%s', "
+                        "TEMPLATE_STRING_IF_INVALID='%s', "
+                        "TEMPLATE_DEBUG=%s): %s -- FAILED. "
+                        "Template rendering invoked method "
+                        "that shouldn't have been invoked." % \
+                        (is_cached, invalid_str, template_debug, name))
+            except ContextStackException:
+                failures.append(
+                    "Template test (Cached='%s', "
+                    "TEMPLATE_STRING_IF_INVALID='%s', "
+                    "TEMPLATE_DEBUG=%s): %s -- FAILED. "
+                    "Context stack was left imbalanced" % \
+                    (is_cached, invalid_str, template_debug, name))
+                return
+            except Exception:
+                exc_type, exc_value, exc_tb = sys.exc_info()
+                if exc_type != result:
+                    tb = '\n'.join(traceback.format_exception( \
+                        exc_type, exc_value, exc_tb))
+                    failures.append(
+                        "Template test (Cached='%s', "
+                        "TEMPLATE_STRING_IF_INVALID='%s', "
+                        "TEMPLATE_DEBUG=%s): %s -- FAILED. "
+                        "Got %s, exception: %s\n%s" % \
+                        (is_cached, invalid_str, template_debug,
+                            name, exc_type, exc_value, tb))
+                return
+            if output != result:
+                failures.append(
+                    "Template test (Cached='%s', "
+                    "TEMPLATE_STRING_IF_INVALID='%s', "
+                    "TEMPLATE_DEBUG=%s): %s -- FAILED. "
+                    "Expected %r, got %r" % \
+                    (is_cached, invalid_str, template_debug,
+                     name, result, output))
+
         def test_template(name, vals):
             expected_invalid_str = 'INVALID'
             if isinstance(vals[2], tuple):
@@ -435,57 +489,8 @@ class Templates(TestCase):
                 settings.TEMPLATE_STRING_IF_INVALID = invalid_str
                 settings.TEMPLATE_DEBUG = template_debug
                 for is_cached in (False, True):
-                    try:
-                        try:
-                            test_template = loader.get_template(name)
-                        except ShouldNotExecuteException:
-                            failures.append(
-                                "Template test (Cached='%s', "
-                                "TEMPLATE_STRING_IF_INVALID='%s', "
-                                "TEMPLATE_DEBUG=%s): %s -- FAILED. "
-                                "Template loading invoked method "
-                                "that shouldn't have been invoked." % \
-                                (is_cached, invalid_str, template_debug, name))
-
-                        try:
-                            output = self.render(test_template, vals)
-                        except ShouldNotExecuteException:
-                            failures.append(
-                                "Template test (Cached='%s', "
-                                "TEMPLATE_STRING_IF_INVALID='%s', "
-                                "TEMPLATE_DEBUG=%s): %s -- FAILED. "
-                                "Template rendering invoked method "
-                                "that shouldn't have been invoked." % \
-                                (is_cached, invalid_str, template_debug, name))
-                    except ContextStackException:
-                        failures.append(
-                            "Template test (Cached='%s', "
-                            "TEMPLATE_STRING_IF_INVALID='%s', "
-                            "TEMPLATE_DEBUG=%s): %s -- FAILED. "
-                            "Context stack was left imbalanced" % \
-                            (is_cached, invalid_str, template_debug, name))
-                        continue
-                    except Exception:
-                        exc_type, exc_value, exc_tb = sys.exc_info()
-                        if exc_type != result:
-                            tb = '\n'.join(traceback.format_exception( \
-                                exc_type, exc_value, exc_tb))
-                            failures.append(
-                                "Template test (Cached='%s', "
-                                "TEMPLATE_STRING_IF_INVALID='%s', "
-                                "TEMPLATE_DEBUG=%s): %s -- FAILED. "
-                                "Got %s, exception: %s\n%s" % \
-                                (is_cached, invalid_str, template_debug,
-                                 name, exc_type, exc_value, tb))
-                        continue
-                    if output != result:
-                        failures.append(
-                            "Template test (Cached='%s', "
-                            "TEMPLATE_STRING_IF_INVALID='%s', "
-                            "TEMPLATE_DEBUG=%s): %s -- FAILED. "
-                            "Expected %r, got %r" % \
-                            (is_cached, invalid_str, template_debug,
-                             name, result, output))
+                    test_one_case(name, is_cached,
+                                  invalid_str, template_debug, result)
                 cache_loader.reset()
 
             if 'LANGUAGE_CODE' in vals[1]:
