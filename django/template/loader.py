@@ -25,8 +25,7 @@
 # Python eggs) sets is_usable to False if the "pkg_resources" module isn't
 # installed, because pkg_resources is necessary to read eggs.
 
-from django.template.base import (Template, Context,
-    add_to_builtins, default_engine)
+from django.template.base import Template, Context, default_engine
 
 
 class BaseLoader(object):
@@ -101,5 +100,3 @@ def render_to_string(template_name, dictionary=None, context_instance=None):
 
 def select_template(template_name_list):
     return default_engine.select_template(template_name_list)
-
-add_to_builtins('django.template.loader_tags')
