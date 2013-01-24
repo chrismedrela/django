@@ -27,7 +27,7 @@
 
 from django.core.exceptions import ImproperlyConfigured
 from django.template.base import (Origin, Template, Context,
-    TemplateDoesNotExist, add_to_builtins, default_engine, make_origin)
+    TemplateDoesNotExist, default_engine, make_origin)
 from django.utils.importlib import import_module
 from django.conf import settings
 from django.utils import six
@@ -105,5 +105,3 @@ def render_to_string(template_name, dictionary=None, context_instance=None):
 
 def select_template(template_name_list):
     return default_engine.select_template(template_name_list)
-
-add_to_builtins('django.template.loader_tags')

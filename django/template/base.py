@@ -67,168 +67,6 @@ tag_re = (re.compile('(%s.*?%s|%s.*?%s|%s.*?%s)' %
 invalid_var_format_string = None
 
 
-class TemplateEngine(object):
-    def __init__(self, loaders=None):
-        self._libraries = {}
-        # If loaders == None then the loaders will be collected basing on
-        # settings module on the first call of self.find_template.
-        self._template_source_loaders = loaders
-        # global list of libraries to load by default for a new parser
-        self._builtins = []
-
-    def get_library(self, library_name):
-        # OLD COMMENT FIXME
-        """
-        Load the template library module with the given name.
-
-        If library is not already loaded loop over all templatetags modules
-        to locate it.
-
-        {% load somelib %} and {% load someotherlib %} loops twice.
-
-        Subsequent loads eg. {% load somelib %} in the same process will grab
-        the cached module from libraries.
-
-        """
-
-        lib = self._libraries.get(library_name, None)
-        if not lib:
-            templatetags_modules = get_templatetags_modules()
-            tried_modules = []
-            for module in templatetags_modules:
-                taglib_module = '%s.%s' % (module, library_name)
-                tried_modules.append(taglib_module)
-                lib = import_library(taglib_module)
-                if lib:
-                    self._libraries[library_name] = lib
-                    break
-            if not lib:
-                raise InvalidTemplateLibrary(
-                    "Template library %s not found, tried %s" %
-                    (library_name,
-                     ','.join(tried_modules)))
-        return lib
-
-    def compile_string(self, template_string, origin):
-        "Compiles template_string into NodeList ready for rendering"
-
-        if settings.TEMPLATE_DEBUG:
-            from django.template.debug import DebugLexer, DebugParser
-            lexer_class, parser_class = DebugLexer, DebugParser
-        else:
-            lexer_class, parser_class = Lexer, Parser
-        lexer = lexer_class(template_string, origin)
-        parser = parser_class(self, lexer.tokenize())
-        return parser.parse()
-
-    def find_template(self, name, dirs=None):
-        """ Returns tuple of _Template instance and origin. """
-
-        # OLD COMMENT FIXME
-        # Calculate template_source_loaders the first time the function is
-        # executed because putting this logic in the module-level namespace
-        # may cause circular import errors. See Django ticket #1292.
-        if self._template_source_loaders is None:
-            self._template_source_loaders = _calculate_template_source_loaders()
-
-        for loader in self._template_source_loaders:
-            try:
-                template, display_name = loader(name, dirs)
-            except TemplateDoesNotExist:
-                pass
-            else:
-                origin = make_origin(display_name, loader, name, dirs)
-                if not isinstance(template, _Template):
-                    template = _Template(self, template, origin, name)
-                return template, origin
-        raise TemplateDoesNotExist(name)
-
-    def select_template(self, template_names):
-        """ Given a list of template names, returns the first that can be
-        loaded. """
-
-        if not template_names:
-            raise TemplateDoesNotExist("No template names provided")
-        not_found = []
-        for template_name in template_names:
-            try:
-                template, _ = self.find_template(template_name)
-                return template
-            except TemplateDoesNotExist as e:
-                if e.args[0] not in not_found:
-                    not_found.append(e.args[0])
-                continue
-        # If we get here, none of the templates could be loaded
-        raise TemplateDoesNotExist(', '.join(not_found))
-
-    def add_to_builtins(self, library):
-        assert isinstance(library, Library)
-        self._builtins.append(library)
-
-    def get_template_source_loaders(self):
-        return self._template_source_loaders
-
-def TemplateEngineWithBuiltins(*args, **kwargs):
-    engine = TemplateEngine(*args, **kwargs)
-    builtins = [
-        'django.template.defaulttags',
-        'django.template.defaultfilters',
-        'django.template.loader_tags',
-    ]
-    for builtin in builtins:
-        engine.add_to_builtins(import_library(builtin))
-    return engine
-
-def find_template_loader(loader):
-    if isinstance(loader, (tuple, list)):
-        loader, args = loader[0], loader[1:]
-    else:
-        args = []
-    if isinstance(loader, six.string_types):
-        module, attr = loader.rsplit('.', 1)
-        try:
-            mod = import_module(module)
-        except ImportError as e:
-            raise ImproperlyConfigured('Error importing template source loader %s: "%s"' % (loader, e))
-        try:
-            TemplateLoader = getattr(mod, attr)
-        except AttributeError as e:
-            raise ImproperlyConfigured('Error importing template source loader %s: "%s"' % (loader, e))
-
-        if hasattr(TemplateLoader, 'load_template_source'):
-            func = TemplateLoader(*args)
-        else:
-            # Try loading module the old way - string is full path to callable
-            if args:
-                raise ImproperlyConfigured("Error importing template source loader %s - can't pass arguments to function-based loader." % loader)
-            func = TemplateLoader
-
-        if not func.is_usable:
-            import warnings
-            warnings.warn("Your TEMPLATE_LOADERS setting includes %r, but your Python installation doesn't support that type of template loading. Consider removing that line from TEMPLATE_LOADERS." % loader)
-            return None
-        else:
-            return func
-    else:
-        raise ImproperlyConfigured('Loader does not define a "load_template" callable template source loader')
-
-def make_origin(display_name, loader, name, dirs):
-    if settings.TEMPLATE_DEBUG and display_name:
-        return LoaderOrigin(display_name, loader, name, dirs)
-    else:
-        return None
-
-def _calculate_template_source_loaders():
-    loaders = []
-    for loader_name in settings.TEMPLATE_LOADERS:
-        loader = find_template_loader(loader_name)
-        if loader is not None:
-            loaders.append(loader)
-    return tuple(loaders)
-
-default_engine = TemplateEngine()
-
-
 class TemplateSyntaxError(Exception):
     pass
 
@@ -1453,8 +1291,172 @@ def get_library(library_name):
     return default_engine.get_library(library_name)
 
 def add_to_builtins(module):
-    default_engine.add_to_builtins(import_library(module))
+    default_engine.add_to_builtins(module)
 
 
-add_to_builtins('django.template.defaulttags')
-add_to_builtins('django.template.defaultfilters')
+class TemplateEngine(object):
+    def __init__(self, loaders=None):
+        self._libraries = {}
+        # If loaders == None then the loaders will be collected basing on
+        # settings module on the first call of self.find_template.
+        self._template_source_loaders = loaders
+        # global list of libraries to load by default for a new parser
+        self._builtins = []
+
+    def get_library(self, library_name):
+        # OLD COMMENT FIXME
+        """
+        Load the template library module with the given name.
+
+        If library is not already loaded loop over all templatetags modules
+        to locate it.
+
+        {% load somelib %} and {% load someotherlib %} loops twice.
+
+        Subsequent loads eg. {% load somelib %} in the same process will grab
+        the cached module from libraries.
+
+        """
+
+        lib = self._libraries.get(library_name, None)
+        if not lib:
+            templatetags_modules = get_templatetags_modules()
+            tried_modules = []
+            for module in templatetags_modules:
+                taglib_module = '%s.%s' % (module, library_name)
+                tried_modules.append(taglib_module)
+                lib = import_library(taglib_module)
+                if lib:
+                    self._libraries[library_name] = lib
+                    break
+            if not lib:
+                raise InvalidTemplateLibrary(
+                    "Template library %s not found, tried %s" %
+                    (library_name,
+                     ','.join(tried_modules)))
+        return lib
+
+    def compile_string(self, template_string, origin):
+        "Compiles template_string into NodeList ready for rendering"
+
+        if settings.TEMPLATE_DEBUG:
+            from django.template.debug import DebugLexer, DebugParser
+            lexer_class, parser_class = DebugLexer, DebugParser
+        else:
+            lexer_class, parser_class = Lexer, Parser
+        lexer = lexer_class(template_string, origin)
+        parser = parser_class(self, lexer.tokenize())
+        return parser.parse()
+
+    def find_template(self, name, dirs=None):
+        """ Returns tuple of _Template instance and origin. """
+
+        # OLD COMMENT FIXME
+        # Calculate template_source_loaders the first time the function is
+        # executed because putting this logic in the module-level namespace
+        # may cause circular import errors. See Django ticket #1292.
+        if self._template_source_loaders is None:
+            self._template_source_loaders = _calculate_template_source_loaders()
+
+        for loader in self._template_source_loaders:
+            try:
+                template, display_name = loader(name, dirs)
+            except TemplateDoesNotExist:
+                pass
+            else:
+                origin = make_origin(display_name, loader, name, dirs)
+                if not isinstance(template, _Template):
+                    template = _Template(self, template, origin, name)
+                return template, origin
+        raise TemplateDoesNotExist(name)
+
+    def select_template(self, template_names):
+        """ Given a list of template names, returns the first that can be
+        loaded. """
+
+        if not template_names:
+            raise TemplateDoesNotExist("No template names provided")
+        not_found = []
+        for template_name in template_names:
+            try:
+                template, _ = self.find_template(template_name)
+                return template
+            except TemplateDoesNotExist as e:
+                if e.args[0] not in not_found:
+                    not_found.append(e.args[0])
+                continue
+        # If we get here, none of the templates could be loaded
+        raise TemplateDoesNotExist(', '.join(not_found))
+
+    def add_to_builtins(self, library):
+        if not isinstance(library, Library):
+            library = import_library(library)
+        self._builtins.append(library)
+
+    def get_template_source_loaders(self):
+        return self._template_source_loaders
+
+def TemplateEngineWithBuiltins(*args, **kwargs):
+    engine = TemplateEngine(*args, **kwargs)
+    builtins = [
+        'django.template.defaulttags',
+        'django.template.defaultfilters',
+        'django.template.loader_tags',
+    ]
+    for builtin in builtins:
+        engine.add_to_builtins(import_library(builtin))
+    return engine
+
+def find_template_loader(loader):
+    if isinstance(loader, (tuple, list)):
+        loader, args = loader[0], loader[1:]
+    else:
+        args = []
+    if isinstance(loader, six.string_types):
+        module, attr = loader.rsplit('.', 1)
+        try:
+            mod = import_module(module)
+        except ImportError as e:
+            raise ImproperlyConfigured('Error importing template source loader %s: "%s"' % (loader, e))
+        try:
+            TemplateLoader = getattr(mod, attr)
+        except AttributeError as e:
+            raise ImproperlyConfigured('Error importing template source loader %s: "%s"' % (loader, e))
+
+        if hasattr(TemplateLoader, 'load_template_source'):
+            func = TemplateLoader(*args)
+        else:
+            # Try loading module the old way - string is full path to callable
+            if args:
+                raise ImproperlyConfigured("Error importing template source loader %s - can't pass arguments to function-based loader." % loader)
+            func = TemplateLoader
+
+        if not func.is_usable:
+            import warnings
+            warnings.warn("Your TEMPLATE_LOADERS setting includes %r, but your Python installation doesn't support that type of template loading. Consider removing that line from TEMPLATE_LOADERS." % loader)
+            return None
+        else:
+            return func
+    else:
+        raise ImproperlyConfigured('Loader does not define a "load_template" callable template source loader')
+
+def make_origin(display_name, loader, name, dirs):
+    if settings.TEMPLATE_DEBUG and display_name:
+        return LoaderOrigin(display_name, loader, name, dirs)
+    else:
+        return None
+
+def _calculate_template_source_loaders():
+    loaders = []
+    for loader_name in settings.TEMPLATE_LOADERS:
+        loader = find_template_loader(loader_name)
+        if loader is not None:
+            loaders.append(loader)
+    return tuple(loaders)
+
+default_engine = TemplateEngine()
+default_engine.add_to_builtins('django.template.defaulttags')
+default_engine.add_to_builtins('django.template.defaultfilters')
+default_engine.add_to_builtins('django.template.loader_tags')
+def get_default_engine():
+    return default_engine

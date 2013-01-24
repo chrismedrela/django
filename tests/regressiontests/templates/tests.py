@@ -399,7 +399,6 @@ class Templates(TestCase):
             self.assertEqual(e.args[0], "Invalid block tag: 'endblock', expected 'elif', 'else' or 'endif'")
 
     def test_templates(self):
-
         def test_one_case(name, is_cached,
                           invalid_str, template_debug, result):
             try:
