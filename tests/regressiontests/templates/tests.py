@@ -56,31 +56,6 @@ except ImportError as e:
 
 from . import filters
 
-#################################
-# Custom template tag for tests #
-#################################
-
-register = template.Library()
-
-class EchoNode(template.Node):
-    def __init__(self, contents):
-        self.contents = contents
-
-    def render(self, context):
-        return " ".join(self.contents)
-
-def do_echo(parser, token):
-    return EchoNode(token.contents.split()[1:])
-
-def do_upper(value):
-    return value.upper()
-
-register.tag("echo", do_echo)
-register.tag("other_echo", do_echo)
-register.filter("upper", do_upper)
-
-template.default_engine._libraries['testtags'] = register
-
 #####################################
 # Helper objects for template tests #
 #####################################
@@ -434,23 +409,15 @@ class SmallTests(TestCase):
 
     def test_templates(self):
         tests = self._get_template_and_filter_tests()
-        templates = dict([(test.name, test.template_source) for test in tests])
+        templates = self._get_templates_from_tests(tests)
+        cache_loader, engine = self._create_cache_loader_and_engine(templates)
+        self._warm_up_URL_reversing_cache() # Don't pay the cost of warming
+                                            # the cache during the tests!
 
-        dict_loader = DictionaryLoader(templates)
-        cache_loader = cached.Loader(('blb',))
-        cache_loader._cached_loaders = (dict_loader,)
         old_template_source_loaders = default_engine._template_source_loaders
-        default_engine._template_source_loaders = (cache_loader,)
-        engine = default_engine
-
         old_td = settings.TEMPLATE_DEBUG
         old_invalid = settings.TEMPLATE_STRING_IF_INVALID
         old_allowed_include_roots = settings.ALLOWED_INCLUDE_ROOTS
-
-        # Warm the URL reversing cache. This ensures we don't pay the cost
-        # warming the cache during one of the tests.
-        urlresolvers.reverse('regressiontests.templates.views.client_action',
-                             kwargs={'id':0,'action':"update"})
 
         failures = []
 
@@ -463,18 +430,71 @@ class SmallTests(TestCase):
                 if new_failures:
                     failures.append(new_failures)
 
-        default_engine._template_source_loaders = old_template_source_loaders
-        deactivate()
+        deactivate() # just to be on the safe side
+        assert default_engine._template_source_loaders == old_template_source_loaders
         assert settings.TEMPLATE_DEBUG == old_td
         assert settings.TEMPLATE_STRING_IF_INVALID == old_invalid
         assert settings.ALLOWED_INCLUDE_ROOTS == old_allowed_include_roots
 
-        separator = ('\n'+'-'*70+'\n')
-        failures_raport = 'Tests failed:\n' + \
-            separator + \
-            separator.join("\n".join(failure) for failure in failures) + \
-            separator
-        self.assertEqual(failures, [], failures_raport)
+        # generate and print raport
+        self._assert_no_failures(failures)
+
+    def _get_template_and_filter_tests(self):
+        template_tests = self._get_template_tests()
+        filter_tests = filters.get_filter_tests()
+
+        # Quickly check that we aren't accidentally using a name in both
+        # template and filter tests.
+        overlapping_names = set(filter_tests) & set(template_tests)
+        assert not overlapping_names, \
+            'Duplicate test name(s): %s' % ', '.join(overlapping_names)
+
+        template_tests.update(filter_tests)
+
+        # Some tests (especially cache-tests) rely on the order of executing
+        # test cases so we need to sort all tests.
+        tests = sorted(template_tests.items())
+
+        return [TemplateTestCase(name, vals)
+                for name, vals in tests]
+
+    def _get_templates_from_tests(self, tests):
+        return dict([(test.name, test.template_source) for test in tests])
+
+    def _create_cache_loader_and_engine(self, templates):
+        dict_loader = DictionaryLoader(templates)
+        cache_loader = cached.Loader(('fake loader',))
+        cache_loader._cached_loaders = (dict_loader,)
+        engine = template.TemplateEngineWithBuiltins([cache_loader])
+        engine._libraries['testtags'] = self._get_library_of_custom_template_tags()
+        return cache_loader, engine
+
+    def _get_library_of_custom_template_tags(self):
+        """ Return library of custom template tag for tests """
+
+        class EchoNode(template.Node):
+            def __init__(self, contents):
+                self.contents = contents
+
+            def render(self, context):
+                return " ".join(self.contents)
+
+        register = template.Library()
+
+        @register.tag('echo')
+        @register.tag('other_echo')
+        def do_echo(parser, token):
+            return EchoNode(token.contents.split()[1:])
+
+        @register.filter('upper')
+        def do_upper(value):
+            return value.upper()
+
+        return register
+
+    def _warm_up_URL_reversing_cache(self):
+        urlresolvers.reverse('regressiontests.templates.views.client_action',
+                             kwargs={'id':0,'action':"update"})
 
     def _run_test(self, test, cache_loader, engine):
         format_ = ("%(test_name)-20s "
@@ -550,23 +570,13 @@ class SmallTests(TestCase):
                 return ("Expected %r, got %r" % (expected_result, output))
         return None
 
-    def _get_template_and_filter_tests(self):
-        template_tests = self._get_template_tests()
-        filter_tests = filters.get_filter_tests()
-
-        # Quickly check that we aren't accidentally using a name in both
-        # template and filter tests.
-        overlapping_names = set(filter_tests) & set(template_tests)
-        assert not overlapping_names, \
-            'Duplicate test name(s): %s' % ', '.join(overlapping_names)
-
-        template_tests.update(filter_tests)
-
-        # Some tests (especially cache-tests) rely on the order of executing
-        # test cases so we need to sort all tests.
-        tests = sorted(template_tests.items())
-        return [TemplateTestCase(name, vals)
-                for name, vals in tests]
+    def _assert_no_failures(self, failures):
+        separator = ('\n'+'-'*70+'\n')
+        failures_raport = 'Tests failed:\n' + \
+            separator + \
+            separator.join("\n".join(failure) for failure in failures) + \
+            separator
+        self.assertEqual(failures, [], failures_raport)
 
     def _get_template_tests(self):
         # Syntax: 'template_name': ('template content', context dict or
