@@ -418,46 +418,61 @@ class TemplateTestCase(object):
             self.invalid_string_result = vals[2]
             self.template_debug_result = vals[2]
 
-        self.context = template.Context(vals[1])
-        self.language_code = vals[1].get("LANGUAGE_CODE", 'en-us')
+        context = vals[1]
+        if callable(context):
+            self._context = context
+        else:
+            self._context = lambda _: context
+
+    def get_context(self, engine):
+        return template.Context(self._context(engine))
+
 
 @override_settings(MEDIA_URL="/media/", STATIC_URL="/static/")
 class SmallTests(TestCase):
     def _test_one_case(self, engine, template_name, context, expected_result):
-        failures = []
         try:
             try:
                 test_template = engine.find_template(template_name)[0]
             except ShouldNotExecuteException:
-                failures.append("Template loading invoked method "
-                                "that shouldn't have been invoked.")
+                return ("Template loading invoked method "
+                        "that shouldn't have been invoked.")
             try:
                 before_stack_size = len(context.dicts)
                 output = test_template.render(context)
                 if len(context.dicts) != before_stack_size:
-                    failures.append("Context stack was left imbalanced")
+                    return "Context stack was left imbalanced"
             except ShouldNotExecuteException:
-                failures.append("Template rendering invoked method "
-                                "that shouldn't have been invoked.")
+                return ("Template rendering invoked method "
+                        "that shouldn't have been invoked.")
         except Exception:
             exc_type, exc_value, exc_tb = sys.exc_info()
             if exc_type != expected_result:
                 tb = '\n'.join(traceback.format_exception( \
                     exc_type, exc_value, exc_tb))
-                failures.append("Got %s, exception: %s\n%s" % \
-                                (exc_type, exc_value, tb))
+                indented_traceback = "\n".join( \
+                    ' '*4 + line for line in tb.split('\n'))
+                return ("Got %s, exception: %s\n%s" % \
+                        (exc_type, exc_value, indented_traceback))
         else:
             if output != expected_result:
-                failures.append("Expected %r, got %r" % (expected_result, output))
-        return failures
+                return ("Expected %r, got %r" % (expected_result, output))
+        return None
 
-    def _test_template(self, test, cache_loader, engine):
+    def _run_test(self, test, cache_loader, engine):
+        format_ = ("%(test_name)-20s "
+                   "%(cached)-6s  "
+                   "%(template_string_if_invalid)-10s  "
+                   "%(template_debug)-5s -> "
+                   "%(message)s")
+
         failures = []
 
         if test.invalid_string_result:
             template_base.invalid_var_format_string = True
 
-        activate(test.language_code)
+        context = test.get_context(engine)
+        activate(context.get("LANGUAGE_CODE", 'en-us'))
 
         for invalid_str, template_debug, expected_result in [
             ('', False, test.normal_string_result),
@@ -468,13 +483,18 @@ class SmallTests(TestCase):
                 TEMPLATE_STRING_IF_INVALID=invalid_str,
                 TEMPLATE_DEBUG=template_debug):
                 for is_cached in (False, True):
-                    new_failures = self._test_one_case(engine, test.name, test.context, expected_result)
-                    message_header = (
-                        "Template test (Cached=%s, "
-                        "TEMPLATE_STRING_IF_INVALID='%s', "
-                        "TEMPLATE_DEBUG=%s): %s -- FAILED. ") % \
-                        (is_cached, invalid_str, template_debug, test.name)
-                    failures.extend(message_header + i for i in new_failures)
+
+                    failure_message = self._test_one_case(
+                        engine, test.name, context, expected_result)
+
+                    if failure_message:
+                        new_failure = format_ % {
+                            'test_name':test.name,
+                            'cached':'cached' if is_cached else '',
+                            'template_string_if_invalid':repr(invalid_str),
+                            'template_debug':'debug' if template_debug else '',
+                            'message':failure_message}
+                        failures.append(new_failure)
             cache_loader.reset()
 
         deactivate()
@@ -484,8 +504,8 @@ class SmallTests(TestCase):
 
         return failures
 
-    def _collect_all_tests(self):
-        template_tests = self.get_template_tests()
+    def _get_all_tests(self):
+        template_tests = self._get_template_tests()
         filter_tests = filters.get_filter_tests()
 
         # Quickly check that we aren't accidentally using a name in both
@@ -498,11 +518,8 @@ class SmallTests(TestCase):
         tests = sorted(template_tests.items())
         return tests
 
-    def setUp(self):
-        self.engine = template.TemplateEngineWithBuiltins()
-
     def test_templates(self):
-        tests = self._collect_all_tests()
+        tests = self._get_all_tests()
 
         templates = dict([(name, t[0]) for name, t in tests])
         dict_loader = DictionaryLoader(templates)
@@ -529,8 +546,9 @@ class SmallTests(TestCase):
         with override_settings(ALLOWED_INCLUDE_ROOTS=allowed_include_roots):
             for name, vals in tests:
                 test = TemplateTestCase(name, vals)
-                new_failures = self._test_template(test, cache_loader, engine)
-                failures.extend(new_failures)
+                new_failures = self._run_test(test, cache_loader, engine)
+                if new_failures:
+                    failures.append(new_failures)
 
         default_engine._template_source_loaders = old_template_source_loaders
         deactivate()
@@ -538,11 +556,16 @@ class SmallTests(TestCase):
         assert settings.TEMPLATE_STRING_IF_INVALID == old_invalid
         assert settings.ALLOWED_INCLUDE_ROOTS == old_allowed_include_roots
 
-        self.assertEqual(failures, [], "Tests failed:\n%s\n%s" %
-            ('-'*70, ("\n%s\n" % ('-'*70)).join(failures)))
+        separator = ('\n'+'-'*70+'\n')
+        failures_raport = 'Tests failed:\n' + \
+            separator + \
+            separator.join("\n".join(failure) for failure in failures) + \
+            separator
+        self.assertEqual(failures, [], failures_raport)
 
-    def get_template_tests(self):
-        # Syntax: 'template_name': ('template content', 'context dict',
+    def _get_template_tests(self):
+        # Syntax: 'template_name': ('template content', context dict or
+        # function receiving template engine and returning context dict,
         # 'expected string output' or Exception class or tuple of expected
         # strings output). The last tuple should contain normal string result
         # and invalid string result. It may also contain template debug result
@@ -1199,10 +1222,10 @@ class SmallTests(TestCase):
             'inheritance23': ("{% extends 'inheritance20' %}{% block first %}{{ block.super }}b{% endblock %}", {}, '1&ab3_'),
 
             # Inheritance from local context without use of template loader
-            'inheritance24': ("{% extends context_template %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", {'context_template': template._Template(self.engine, "1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")}, '1234'),
+            'inheritance24': ("{% extends context_template %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", lambda engine: {'context_template': template._Template(engine, "1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")}, '1234'),
 
             # Inheritance from local context with variable parent template
-            'inheritance25': ("{% extends context_template.1 %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", {'context_template': [template._Template(self.engine, "Wrong"), template._Template(self.engine, "1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")]}, '1234'),
+            'inheritance25': ("{% extends context_template.1 %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", lambda engine: {'context_template': [template._Template(engine, "Wrong"), template._Template(engine, "1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")]}, '1234'),
 
             # Set up a base template to extend
             'inheritance26': ("no tags", {}, 'no tags'),
