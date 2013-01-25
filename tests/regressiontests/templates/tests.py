@@ -399,6 +399,7 @@ class Templates(TestCase):
 class TemplateTestCase(object):
     def __init__(self, name, vals):
         self.name = name
+        self.template_source = vals[0]
         self.expected_invalid_str = 'INVALID'
         self.invalid_string_result = False
         if isinstance(vals[2], tuple):
@@ -433,8 +434,8 @@ class SmallTests(TestCase):
 
     def test_templates(self):
         tests = self._get_template_and_filter_tests()
+        templates = dict([(test.name, test.template_source) for test in tests])
 
-        templates = dict([(name, t[0]) for name, t in tests])
         dict_loader = DictionaryLoader(templates)
         cache_loader = cached.Loader(('blb',))
         cache_loader._cached_loaders = (dict_loader,)
@@ -457,8 +458,7 @@ class SmallTests(TestCase):
         allowed_include_roots = \
             (os.path.dirname(os.path.abspath(upath(__file__))),)
         with override_settings(ALLOWED_INCLUDE_ROOTS=allowed_include_roots):
-            for name, vals in tests:
-                test = TemplateTestCase(name, vals)
+            for test in tests:
                 new_failures = self._run_test(test, cache_loader, engine)
                 if new_failures:
                     failures.append(new_failures)
@@ -561,8 +561,12 @@ class SmallTests(TestCase):
             'Duplicate test name(s): %s' % ', '.join(overlapping_names)
 
         template_tests.update(filter_tests)
+
+        # Some tests (especially cache-tests) rely on the order of executing
+        # test cases so we need to sort all tests.
         tests = sorted(template_tests.items())
-        return tests
+        return [TemplateTestCase(name, vals)
+                for name, vals in tests]
 
     def _get_template_tests(self):
         # Syntax: 'template_name': ('template content', context dict or
