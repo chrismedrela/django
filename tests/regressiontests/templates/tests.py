@@ -430,34 +430,51 @@ class TemplateTestCase(object):
 
 @override_settings(MEDIA_URL="/media/", STATIC_URL="/static/")
 class SmallTests(TestCase):
-    def _test_one_case(self, engine, template_name, context, expected_result):
-        try:
-            try:
-                test_template = engine.find_template(template_name)[0]
-            except ShouldNotExecuteException:
-                return ("Template loading invoked method "
-                        "that shouldn't have been invoked.")
-            try:
-                before_stack_size = len(context.dicts)
-                output = test_template.render(context)
-                if len(context.dicts) != before_stack_size:
-                    return "Context stack was left imbalanced"
-            except ShouldNotExecuteException:
-                return ("Template rendering invoked method "
-                        "that shouldn't have been invoked.")
-        except Exception:
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            if exc_type != expected_result:
-                tb = '\n'.join(traceback.format_exception( \
-                    exc_type, exc_value, exc_tb))
-                indented_traceback = "\n".join( \
-                    ' '*4 + line for line in tb.split('\n'))
-                return ("Got %s, exception: %s\n%s" % \
-                        (exc_type, exc_value, indented_traceback))
-        else:
-            if output != expected_result:
-                return ("Expected %r, got %r" % (expected_result, output))
-        return None
+
+    def test_templates(self):
+        tests = self._get_template_and_filter_tests()
+
+        templates = dict([(name, t[0]) for name, t in tests])
+        dict_loader = DictionaryLoader(templates)
+        cache_loader = cached.Loader(('blb',))
+        cache_loader._cached_loaders = (dict_loader,)
+        old_template_source_loaders = default_engine._template_source_loaders
+        default_engine._template_source_loaders = (cache_loader,)
+        engine = default_engine
+
+        old_td = settings.TEMPLATE_DEBUG
+        old_invalid = settings.TEMPLATE_STRING_IF_INVALID
+        old_allowed_include_roots = settings.ALLOWED_INCLUDE_ROOTS
+
+        # Warm the URL reversing cache. This ensures we don't pay the cost
+        # warming the cache during one of the tests.
+        urlresolvers.reverse('regressiontests.templates.views.client_action',
+                             kwargs={'id':0,'action':"update"})
+
+        failures = []
+
+        # Set ALLOWED_INCLUDE_ROOTS so that ssi works.
+        allowed_include_roots = \
+            (os.path.dirname(os.path.abspath(upath(__file__))),)
+        with override_settings(ALLOWED_INCLUDE_ROOTS=allowed_include_roots):
+            for name, vals in tests:
+                test = TemplateTestCase(name, vals)
+                new_failures = self._run_test(test, cache_loader, engine)
+                if new_failures:
+                    failures.append(new_failures)
+
+        default_engine._template_source_loaders = old_template_source_loaders
+        deactivate()
+        assert settings.TEMPLATE_DEBUG == old_td
+        assert settings.TEMPLATE_STRING_IF_INVALID == old_invalid
+        assert settings.ALLOWED_INCLUDE_ROOTS == old_allowed_include_roots
+
+        separator = ('\n'+'-'*70+'\n')
+        failures_raport = 'Tests failed:\n' + \
+            separator + \
+            separator.join("\n".join(failure) for failure in failures) + \
+            separator
+        self.assertEqual(failures, [], failures_raport)
 
     def _run_test(self, test, cache_loader, engine):
         format_ = ("%(test_name)-20s "
@@ -504,7 +521,36 @@ class SmallTests(TestCase):
 
         return failures
 
-    def _get_all_tests(self):
+    def _test_one_case(self, engine, template_name, context, expected_result):
+        try:
+            try:
+                test_template = engine.find_template(template_name)[0]
+            except ShouldNotExecuteException:
+                return ("Template loading invoked method "
+                        "that shouldn't have been invoked.")
+            try:
+                before_stack_size = len(context.dicts)
+                output = test_template.render(context)
+                if len(context.dicts) != before_stack_size:
+                    return "Context stack was left imbalanced"
+            except ShouldNotExecuteException:
+                return ("Template rendering invoked method "
+                        "that shouldn't have been invoked.")
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            if exc_type != expected_result:
+                tb = '\n'.join(traceback.format_exception( \
+                    exc_type, exc_value, exc_tb))
+                indented_traceback = "\n".join( \
+                    ' '*4 + line for line in tb.split('\n'))
+                return ("Got %s, exception: %s\n%s" % \
+                        (exc_type, exc_value, indented_traceback))
+        else:
+            if output != expected_result:
+                return ("Expected %r, got %r" % (expected_result, output))
+        return None
+
+    def _get_template_and_filter_tests(self):
         template_tests = self._get_template_tests()
         filter_tests = filters.get_filter_tests()
 
@@ -517,51 +563,6 @@ class SmallTests(TestCase):
         template_tests.update(filter_tests)
         tests = sorted(template_tests.items())
         return tests
-
-    def test_templates(self):
-        tests = self._get_all_tests()
-
-        templates = dict([(name, t[0]) for name, t in tests])
-        dict_loader = DictionaryLoader(templates)
-        cache_loader = cached.Loader(('blb',))
-        cache_loader._cached_loaders = (dict_loader,)
-        old_template_source_loaders = default_engine._template_source_loaders
-        default_engine._template_source_loaders = (cache_loader,)
-        engine = default_engine
-
-        old_td = settings.TEMPLATE_DEBUG
-        old_invalid = settings.TEMPLATE_STRING_IF_INVALID
-        old_allowed_include_roots = settings.ALLOWED_INCLUDE_ROOTS
-
-        # Warm the URL reversing cache. This ensures we don't pay the cost
-        # warming the cache during one of the tests.
-        urlresolvers.reverse('regressiontests.templates.views.client_action',
-                             kwargs={'id':0,'action':"update"})
-
-        failures = []
-
-        # Set ALLOWED_INCLUDE_ROOTS so that ssi works.
-        allowed_include_roots = \
-            (os.path.dirname(os.path.abspath(upath(__file__))),)
-        with override_settings(ALLOWED_INCLUDE_ROOTS=allowed_include_roots):
-            for name, vals in tests:
-                test = TemplateTestCase(name, vals)
-                new_failures = self._run_test(test, cache_loader, engine)
-                if new_failures:
-                    failures.append(new_failures)
-
-        default_engine._template_source_loaders = old_template_source_loaders
-        deactivate()
-        assert settings.TEMPLATE_DEBUG == old_td
-        assert settings.TEMPLATE_STRING_IF_INVALID == old_invalid
-        assert settings.ALLOWED_INCLUDE_ROOTS == old_allowed_include_roots
-
-        separator = ('\n'+'-'*70+'\n')
-        failures_raport = 'Tests failed:\n' + \
-            separator + \
-            separator.join("\n".join(failure) for failure in failures) + \
-            separator
-        self.assertEqual(failures, [], failures_raport)
 
     def _get_template_tests(self):
         # Syntax: 'template_name': ('template content', context dict or
