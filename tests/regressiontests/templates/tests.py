@@ -428,7 +428,7 @@ class SmallTests(TestCase):
             for test in tests:
                 new_failures = self._run_test(test, cache_loader, engine)
                 if new_failures:
-                    failures.append(new_failures)
+                    failures.extend(new_failures)
 
         deactivate() # just to be on the safe side
         assert default_engine._template_source_loaders == old_template_source_loaders
@@ -497,20 +497,11 @@ class SmallTests(TestCase):
                              kwargs={'id':0,'action':"update"})
 
     def _run_test(self, test, cache_loader, engine):
-        format_ = ("%(test_name)-20s "
-                   "%(cached)-6s  "
-                   "%(template_string_if_invalid)-10s  "
-                   "%(template_debug)-5s -> "
-                   "%(message)s")
-
         failures = []
-
-        if test.invalid_string_result:
-            template_base.invalid_var_format_string = True
-
         context = test.get_context(engine)
-        activate(context.get("LANGUAGE_CODE", 'en-us'))
 
+        template_base.invalid_var_format_string = test.invalid_string_result
+        activate(context.get("LANGUAGE_CODE", 'en-us'))
         for invalid_str, template_debug, expected_result in [
             ('', False, test.normal_string_result),
             (test.expected_invalid_str, False, test.invalid_string_result),
@@ -520,24 +511,22 @@ class SmallTests(TestCase):
                 TEMPLATE_STRING_IF_INVALID=invalid_str,
                 TEMPLATE_DEBUG=template_debug):
                 for is_cached in (False, True):
-
                     failure_message = self._test_one_case(
                         engine, test.name, context, expected_result)
 
                     if failure_message:
-                        new_failure = format_ % {
-                            'test_name':test.name,
-                            'cached':'cached' if is_cached else '',
-                            'template_string_if_invalid':repr(invalid_str),
-                            'template_debug':'debug' if template_debug else '',
-                            'message':failure_message}
-                        failures.append(new_failure)
+                        failure_message = \
+                            "Test '%s' failed (cache %s, " \
+                            "invalid_str='%s', debug %s).\n%s" % \
+                            (test.name,
+                             'ON' if is_cached else 'OFF',
+                             invalid_str,
+                             'ON' if template_debug else 'OFF',
+                             failure_message)
+                        failures.append(failure_message)
             cache_loader.reset()
-
         deactivate()
-
-        if template_base.invalid_var_format_string:
-            template_base.invalid_var_format_string = False
+        template_base.invalid_var_format_string = False
 
         return failures
 
@@ -561,20 +550,19 @@ class SmallTests(TestCase):
             if exc_type != expected_result:
                 tb = '\n'.join(traceback.format_exception( \
                     exc_type, exc_value, exc_tb))
-                indented_traceback = "\n".join( \
-                    ' '*4 + line for line in tb.split('\n'))
-                return ("Got %s, exception: %s\n%s" % \
-                        (exc_type, exc_value, indented_traceback))
+                return ("Got: %s\nException: %s\n\n%s" % \
+                        (exc_type, exc_value, tb))
         else:
             if output != expected_result:
-                return ("Expected %r, got %r" % (expected_result, output))
+                return ("Expected: %r\n"
+                        "Got:      %r" % (expected_result, output))
         return None
 
     def _assert_no_failures(self, failures):
         separator = ('\n'+'-'*70+'\n')
         failures_raport = 'Tests failed:\n' + \
             separator + \
-            separator.join("\n".join(failure) for failure in failures) + \
+            separator.join(failures) + \
             separator
         self.assertEqual(failures, [], failures_raport)
 
