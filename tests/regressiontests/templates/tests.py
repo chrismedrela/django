@@ -395,7 +395,35 @@ class Templates(TestCase):
         except template.TemplateSyntaxError as e:
             self.assertEqual(e.args[0], "Invalid block tag: 'endblock', expected 'elif', 'else' or 'endif'")
 
-    def _test_one_case(self, template_name, expected_result, context, engine):
+
+class TemplateTestCase(object):
+    def __init__(self, name, vals):
+        self.name = name
+        self.expected_invalid_str = 'INVALID'
+        self.invalid_string_result = False
+        if isinstance(vals[2], tuple):
+            self.normal_string_result = vals[2][0]
+            self.invalid_string_result = vals[2][1]
+            if isinstance(self.invalid_string_result, tuple):
+                self.expected_invalid_str = 'INVALID %s'
+                self.invalid_string_result = \
+                  self.invalid_string_result[0] % self.invalid_string_result[1]
+            try:
+                self.template_debug_result = vals[2][2]
+            except IndexError:
+                self.template_debug_result = self.normal_string_result
+
+        else:
+            self.normal_string_result = vals[2]
+            self.invalid_string_result = vals[2]
+            self.template_debug_result = vals[2]
+
+        self.context = template.Context(vals[1])
+        self.language_code = vals[1].get("LANGUAGE_CODE", 'en-us')
+
+@override_settings(MEDIA_URL="/media/", STATIC_URL="/static/")
+class SmallTests(TestCase):
+    def _test_one_case(self, engine, template_name, context, expected_result):
         failures = []
         try:
             try:
@@ -423,93 +451,58 @@ class Templates(TestCase):
                 failures.append("Expected %r, got %r" % (expected_result, output))
         return failures
 
-    def _unpack_vals(self, vals):
-        expected_invalid_str = 'INVALID'
-        invalid_string_result = False
-
-        if isinstance(vals[2], tuple):
-            normal_string_result = vals[2][0]
-            invalid_string_result = vals[2][1]
-            if isinstance(invalid_string_result, tuple):
-                expected_invalid_str = 'INVALID %s'
-                invalid_string_result = \
-                  invalid_string_result[0] % invalid_string_result[1]
-            try:
-                template_debug_result = vals[2][2]
-            except IndexError:
-                template_debug_result = normal_string_result
-
-        else:
-            normal_string_result = vals[2]
-            invalid_string_result = vals[2]
-            template_debug_result = vals[2]
-
-        return (normal_string_result,
-                invalid_string_result,
-                template_debug_result,
-                expected_invalid_str,
-                invalid_string_result)
-
-    def _test_template(self, name, vals, cache_loader, engine):
+    def _test_template(self, test, cache_loader, engine):
         failures = []
 
-        (normal_string_result,
-         invalid_string_result,
-         template_debug_result,
-         expected_invalid_str,
-         invalid_string_result) = self._unpack_vals(vals)
-
-        if invalid_string_result:
+        if test.invalid_string_result:
             template_base.invalid_var_format_string = True
 
-        if 'LANGUAGE_CODE' in vals[1]:
-            activate(vals[1]['LANGUAGE_CODE'])
-        else:
-            activate('en-us')
+        activate(test.language_code)
 
         for invalid_str, template_debug, expected_result in [
-            ('', False, normal_string_result),
-            (expected_invalid_str, False, invalid_string_result),
-            ('', True, template_debug_result)
+            ('', False, test.normal_string_result),
+            (test.expected_invalid_str, False, test.invalid_string_result),
+            ('', True, test.template_debug_result)
         ]:
             with override_settings(
                 TEMPLATE_STRING_IF_INVALID=invalid_str,
                 TEMPLATE_DEBUG=template_debug):
                 for is_cached in (False, True):
-                    context = template.Context(vals[1])
-                    new_failures = self._test_one_case(name, expected_result, context, engine)
+                    new_failures = self._test_one_case(engine, test.name, test.context, expected_result)
                     message_header = (
                         "Template test (Cached=%s, "
                         "TEMPLATE_STRING_IF_INVALID='%s', "
                         "TEMPLATE_DEBUG=%s): %s -- FAILED. ") % \
-                        (is_cached, invalid_str, template_debug, name)
+                        (is_cached, invalid_str, template_debug, test.name)
                     failures.extend(message_header + i for i in new_failures)
             cache_loader.reset()
 
-        if 'LANGUAGE_CODE' in vals[1]:
-            deactivate()
+        deactivate()
 
         if template_base.invalid_var_format_string:
             template_base.invalid_var_format_string = False
 
         return failures
 
+    def _collect_all_tests(self):
+        template_tests = self.get_template_tests()
+        filter_tests = filters.get_filter_tests()
+
+        # Quickly check that we aren't accidentally using a name in both
+        # template and filter tests.
+        overlapping_names = set(filter_tests) & set(template_tests)
+        assert not overlapping_names, \
+            'Duplicate test name(s): %s' % ', '.join(overlapping_names)
+
+        template_tests.update(filter_tests)
+        tests = sorted(template_tests.items())
+        return tests
+
+    def setUp(self):
+        self.engine = template.TemplateEngineWithBuiltins()
+
     def test_templates(self):
-        def collect_all_tests():
-            template_tests = self.get_template_tests()
-            filter_tests = filters.get_filter_tests()
-
-            # Quickly check that we aren't accidentally using a name in both
-            # template and filter tests.
-            overlapping_names = set(filter_tests) & set(template_tests)
-            assert not overlapping_names, \
-                'Duplicate test name(s): %s' % ', '.join(overlapping_names)
-
-            template_tests.update(filter_tests)
-            tests = sorted(template_tests.items())
-            return tests
-
-        tests = collect_all_tests()
+        tests = self._collect_all_tests()
 
         templates = dict([(name, t[0]) for name, t in tests])
         dict_loader = DictionaryLoader(templates)
@@ -535,7 +528,8 @@ class Templates(TestCase):
             (os.path.dirname(os.path.abspath(upath(__file__))),)
         with override_settings(ALLOWED_INCLUDE_ROOTS=allowed_include_roots):
             for name, vals in tests:
-                new_failures = self._test_template(name, vals, cache_loader, engine)
+                test = TemplateTestCase(name, vals)
+                new_failures = self._test_template(test, cache_loader, engine)
                 failures.extend(new_failures)
 
         default_engine._template_source_loaders = old_template_source_loaders
@@ -548,8 +542,13 @@ class Templates(TestCase):
             ('-'*70, ("\n%s\n" % ('-'*70)).join(failures)))
 
     def get_template_tests(self):
-        # SYNTAX: 'template_name': ('template contents', 'context dict',
-        # 'expected string output' or Exception class)
+        # Syntax: 'template_name': ('template content', 'context dict',
+        # 'expected string output' or Exception class or tuple of expected
+        # strings output). The last tuple should contain normal string result
+        # and invalid string result. It may also contain template debug result
+        # (if it's absent then it's the value of normal string
+        # result). Invalid string result may be a string or tuple ('INVALID
+        # %s', 'var').
         basedir = os.path.dirname(os.path.abspath(upath(__file__)))
         tests = {
             ### BASIC SYNTAX ################################################
