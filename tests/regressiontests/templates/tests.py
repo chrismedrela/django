@@ -91,9 +91,6 @@ class SomeException(Exception):
 class SomeOtherException(Exception):
     pass
 
-class ContextStackException(Exception):
-    pass
-
 class ShouldNotExecuteException(Exception):
     pass
 
@@ -398,108 +395,106 @@ class Templates(TestCase):
         except template.TemplateSyntaxError as e:
             self.assertEqual(e.args[0], "Invalid block tag: 'endblock', expected 'elif', 'else' or 'endif'")
 
-    def test_templates(self):
-        def test_one_case(name, is_cached,
-                          invalid_str, template_debug, result):
+    def _test_one_case(self, template_name, expected_result, context, engine):
+        failures = []
+        try:
             try:
-                try:
-                    test_template = engine.find_template(name)[0]
-                except ShouldNotExecuteException:
-                    failures.append(
-                        "Template test (Cached='%s', "
+                test_template = engine.find_template(template_name)[0]
+            except ShouldNotExecuteException:
+                failures.append("Template loading invoked method "
+                                "that shouldn't have been invoked.")
+            try:
+                before_stack_size = len(context.dicts)
+                output = test_template.render(context)
+                if len(context.dicts) != before_stack_size:
+                    failures.append("Context stack was left imbalanced")
+            except ShouldNotExecuteException:
+                failures.append("Template rendering invoked method "
+                                "that shouldn't have been invoked.")
+        except Exception:
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            if exc_type != expected_result:
+                tb = '\n'.join(traceback.format_exception( \
+                    exc_type, exc_value, exc_tb))
+                failures.append("Got %s, exception: %s\n%s" % \
+                                (exc_type, exc_value, tb))
+        else:
+            if output != expected_result:
+                failures.append("Expected %r, got %r" % (expected_result, output))
+        return failures
+
+    def _unpack_vals(self, vals):
+        expected_invalid_str = 'INVALID'
+        invalid_string_result = False
+
+        if isinstance(vals[2], tuple):
+            normal_string_result = vals[2][0]
+            invalid_string_result = vals[2][1]
+            if isinstance(invalid_string_result, tuple):
+                expected_invalid_str = 'INVALID %s'
+                invalid_string_result = \
+                  invalid_string_result[0] % invalid_string_result[1]
+            try:
+                template_debug_result = vals[2][2]
+            except IndexError:
+                template_debug_result = normal_string_result
+
+        else:
+            normal_string_result = vals[2]
+            invalid_string_result = vals[2]
+            template_debug_result = vals[2]
+
+        return (normal_string_result,
+                invalid_string_result,
+                template_debug_result,
+                expected_invalid_str,
+                invalid_string_result)
+
+    def _test_template(self, name, vals, cache_loader, engine):
+        failures = []
+
+        (normal_string_result,
+         invalid_string_result,
+         template_debug_result,
+         expected_invalid_str,
+         invalid_string_result) = self._unpack_vals(vals)
+
+        if invalid_string_result:
+            template_base.invalid_var_format_string = True
+
+        if 'LANGUAGE_CODE' in vals[1]:
+            activate(vals[1]['LANGUAGE_CODE'])
+        else:
+            activate('en-us')
+
+        for invalid_str, template_debug, expected_result in [
+            ('', False, normal_string_result),
+            (expected_invalid_str, False, invalid_string_result),
+            ('', True, template_debug_result)
+        ]:
+            with override_settings(
+                TEMPLATE_STRING_IF_INVALID=invalid_str,
+                TEMPLATE_DEBUG=template_debug):
+                for is_cached in (False, True):
+                    context = template.Context(vals[1])
+                    new_failures = self._test_one_case(name, expected_result, context, engine)
+                    message_header = (
+                        "Template test (Cached=%s, "
                         "TEMPLATE_STRING_IF_INVALID='%s', "
-                        "TEMPLATE_DEBUG=%s): %s -- FAILED. "
-                        "Template loading invoked method "
-                        "that shouldn't have been invoked." % \
-                        (is_cached, invalid_str, template_debug, name))
+                        "TEMPLATE_DEBUG=%s): %s -- FAILED. ") % \
+                        (is_cached, invalid_str, template_debug, name)
+                    failures.extend(message_header + i for i in new_failures)
+            cache_loader.reset()
 
-                try:
-                    output = self.render(test_template, vals)
-                except ShouldNotExecuteException:
-                    failures.append(
-                        "Template test (Cached='%s', "
-                        "TEMPLATE_STRING_IF_INVALID='%s', "
-                        "TEMPLATE_DEBUG=%s): %s -- FAILED. "
-                        "Template rendering invoked method "
-                        "that shouldn't have been invoked." % \
-                        (is_cached, invalid_str, template_debug, name))
-            except ContextStackException:
-                failures.append(
-                    "Template test (Cached='%s', "
-                    "TEMPLATE_STRING_IF_INVALID='%s', "
-                    "TEMPLATE_DEBUG=%s): %s -- FAILED. "
-                    "Context stack was left imbalanced" % \
-                    (is_cached, invalid_str, template_debug, name))
-                return
-            except Exception:
-                exc_type, exc_value, exc_tb = sys.exc_info()
-                if exc_type != result:
-                    tb = '\n'.join(traceback.format_exception( \
-                        exc_type, exc_value, exc_tb))
-                    failures.append(
-                        "Template test (Cached='%s', "
-                        "TEMPLATE_STRING_IF_INVALID='%s', "
-                        "TEMPLATE_DEBUG=%s): %s -- FAILED. "
-                        "Got %s, exception: %s\n%s" % \
-                        (is_cached, invalid_str, template_debug,
-                            name, exc_type, exc_value, tb))
-                return
-            if output != result:
-                failures.append(
-                    "Template test (Cached='%s', "
-                    "TEMPLATE_STRING_IF_INVALID='%s', "
-                    "TEMPLATE_DEBUG=%s): %s -- FAILED. "
-                    "Expected %r, got %r" % \
-                    (is_cached, invalid_str, template_debug,
-                     name, result, output))
+        if 'LANGUAGE_CODE' in vals[1]:
+            deactivate()
 
-        def test_template(name, vals):
-            expected_invalid_str = 'INVALID'
-            if isinstance(vals[2], tuple):
-                normal_string_result = vals[2][0]
-                invalid_string_result = vals[2][1]
+        if template_base.invalid_var_format_string:
+            template_base.invalid_var_format_string = False
 
-                if isinstance(invalid_string_result, tuple):
-                    expected_invalid_str = 'INVALID %s'
-                    invalid_string_result = \
-                      invalid_string_result[0] % invalid_string_result[1]
-                    template_base.invalid_var_format_string = True
+        return failures
 
-                try:
-                    template_debug_result = vals[2][2]
-                except IndexError:
-                    template_debug_result = normal_string_result
-
-            else:
-                normal_string_result = vals[2]
-                invalid_string_result = vals[2]
-                template_debug_result = vals[2]
-
-            if 'LANGUAGE_CODE' in vals[1]:
-                activate(vals[1]['LANGUAGE_CODE'])
-            else:
-                activate('en-us')
-
-            for invalid_str, template_debug, result in [
-                    ('', False, normal_string_result),
-                    (expected_invalid_str, False, invalid_string_result),
-                    ('', True, template_debug_result)
-                ]:
-                with override_settings(
-                    TEMPLATE_STRING_IF_INVALID=invalid_str,
-                    TEMPLATE_DEBUG=template_debug):
-                    for is_cached in (False, True):
-                        test_one_case(name, is_cached,
-                                      invalid_str, template_debug, result)
-                cache_loader.reset()
-
-            if 'LANGUAGE_CODE' in vals[1]:
-                deactivate()
-
-            if template_base.invalid_var_format_string:
-                expected_invalid_str = 'INVALID'
-                template_base.invalid_var_format_string = False
-
+    def test_templates(self):
         def collect_all_tests():
             template_tests = self.get_template_tests()
             filter_tests = filters.get_filter_tests()
@@ -540,7 +535,8 @@ class Templates(TestCase):
             (os.path.dirname(os.path.abspath(upath(__file__))),)
         with override_settings(ALLOWED_INCLUDE_ROOTS=allowed_include_roots):
             for name, vals in tests:
-                test_template(name, vals)
+                new_failures = self._test_template(name, vals, cache_loader, engine)
+                failures.extend(new_failures)
 
         default_engine._template_source_loaders = old_template_source_loaders
         deactivate()
@@ -550,14 +546,6 @@ class Templates(TestCase):
 
         self.assertEqual(failures, [], "Tests failed:\n%s\n%s" %
             ('-'*70, ("\n%s\n" % ('-'*70)).join(failures)))
-
-    def render(self, test_template, vals):
-        context = template.Context(vals[1])
-        before_stack_size = len(context.dicts)
-        output = test_template.render(context)
-        if len(context.dicts) != before_stack_size:
-            raise ContextStackException
-        return output
 
     def get_template_tests(self):
         # SYNTAX: 'template_name': ('template contents', 'context dict',
