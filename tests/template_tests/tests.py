@@ -22,7 +22,7 @@ import warnings
 from django import template
 from django.core import urlresolvers
 from django.template import (base as template_base, loader, Context,
-    RequestContext, _Template, TemplateSyntaxError, default_engine)
+    RequestContext, _Template, TemplateSyntaxError)
 from django.template.loaders import app_directories, filesystem, cached
 from django.test import RequestFactory, TestCase
 from django.test.utils import (setup_test_template_loader,
