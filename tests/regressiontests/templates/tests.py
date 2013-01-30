@@ -20,7 +20,7 @@ except ImportError:     # Python 2
 
 from django import template
 from django.template import (base as template_base, Context, RequestContext,
-    _Template, default_engine)
+    _Template, get_default_engine)
 from django.core import urlresolvers
 from django.template import loader
 from django.template.loaders import app_directories, filesystem, cached
