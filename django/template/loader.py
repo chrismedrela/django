@@ -25,7 +25,7 @@
 # Python eggs) sets is_usable to False if the "pkg_resources" module isn't
 # installed, because pkg_resources is necessary to read eggs.
 
-from django.template.base import Template, Context, default_engine
+from django.template.base import Template, Context, get_default_engine
 
 
 class BaseLoader(object):
@@ -59,14 +59,14 @@ class BaseLoader(object):
 
 
 def find_template(name, dirs=None):
-    return default_engine.find_template(name, dirs)
+    return get_default_engine().find_template(name, dirs)
 
 def get_template(template_name):
     """
     Returns a compiled Template object for the given template name,
     handling template inheritance recursively.
     """
-    template, _ = default_engine.find_template(template_name)
+    template, _ = get_default_engine().find_template(template_name)
     return template
 
 def get_template_from_string(source, origin=None, name=None):
@@ -99,4 +99,4 @@ def render_to_string(template_name, dictionary=None, context_instance=None):
         context_instance.pop()
 
 def select_template(template_name_list):
-    return default_engine.select_template(template_name_list)
+    return get_default_engine().select_template(template_name_list)
