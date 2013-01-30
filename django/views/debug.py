@@ -11,7 +11,7 @@ from django.core.exceptions import ImproperlyConfigured
 from django.http import (HttpResponse, HttpResponseServerError,
     HttpResponseNotFound, HttpRequest, build_request_repr)
 from django.template import (Template, Context, TemplateDoesNotExist,
-    default_engine)
+    get_default_engine)
 from django.template.defaultfilters import force_escape, pprint
 from django.utils.html import escape
 from django.utils.importlib import import_module
@@ -226,7 +226,7 @@ class ExceptionReporter(object):
         if self.exc_type and issubclass(self.exc_type, TemplateDoesNotExist):
             self.template_does_not_exist = True
             self.loader_debug_info = []
-            for loader in default_engine.get_template_source_loaders():
+            for loader in get_default_engine().get_template_source_loaders():
                 try:
                     source_list_func = loader.get_template_sources
                     # NOTE: This assumes exc_value is the name of the template that

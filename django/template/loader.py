@@ -27,7 +27,7 @@
 
 from django.core.exceptions import ImproperlyConfigured
 from django.template.base import (Origin, Template, Context,
-    TemplateDoesNotExist, default_engine, make_origin)
+    TemplateDoesNotExist, get_default_engine, make_origin)
 from django.utils.importlib import import_module
 from django.conf import settings
 from django.utils import six
@@ -64,14 +64,14 @@ class BaseLoader(object):
 
 
 def find_template(name, dirs=None):
-    return default_engine.find_template(name, dirs)
+    return get_default_engine().find_template(name, dirs)
 
 def get_template(template_name):
     """
     Returns a compiled Template object for the given template name,
     handling template inheritance recursively.
     """
-    template, _ = default_engine.find_template(template_name)
+    template, _ = get_default_engine().find_template(template_name)
     return template
 
 def get_template_from_string(source, origin=None, name=None):
@@ -104,4 +104,4 @@ def render_to_string(template_name, dictionary=None, context_instance=None):
         context_instance.pop()
 
 def select_template(template_name_list):
-    return default_engine.select_template(template_name_list)
+    return get_default_engine().select_template(template_name_list)

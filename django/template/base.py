@@ -148,10 +148,10 @@ class _Template(object):
             context.render_context.pop()
 
 def Template(*args, **kwargs):
-    return _Template(default_engine, *args, **kwargs)
+    return _Template(get_default_engine(), *args, **kwargs)
 
 def compile_string(*args, **kwargs):
-    return default_engine.compile_string(*args, **kwargs)
+    return get_default_engine().compile_string(*args, **kwargs)
 
 class Token(object):
     def __init__(self, token_type, contents):
@@ -1289,10 +1289,10 @@ def get_templatetags_modules():
     return templatetags_modules
 
 def get_library(library_name):
-    return default_engine.get_library(library_name)
+    return get_default_engine().get_library(library_name)
 
 def add_to_builtins(module):
-    default_engine.add_to_builtins(module)
+    get_default_engine().add_to_builtins(module)
 
 
 class TemplateEngine(object):
@@ -1455,9 +1455,12 @@ def _calculate_template_source_loaders():
             loaders.append(loader)
     return tuple(loaders)
 
-default_engine = TemplateEngine()
-default_engine.add_to_builtins('django.template.defaulttags')
-default_engine.add_to_builtins('django.template.defaultfilters')
-default_engine.add_to_builtins('django.template.loader_tags')
+_default_engine = None
 def get_default_engine():
-    return default_engine
+    global _default_engine
+    if _default_engine is None:
+        _default_engine = TemplateEngine()
+        _default_engine.add_to_builtins('django.template.defaulttags')
+        _default_engine.add_to_builtins('django.template.defaultfilters')
+        _default_engine.add_to_builtins('django.template.loader_tags')
+    return _default_engine

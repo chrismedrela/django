@@ -20,7 +20,7 @@ except ImportError:     # Python 2
 
 from django import template
 from django.template import (base as template_base, Context, RequestContext,
-    _Template, default_engine)
+    _Template, get_default_engine)
 from django.core import urlresolvers
 from django.template import loader
 from django.template.loaders import app_directories, filesystem, cached
@@ -414,7 +414,7 @@ class SmallTests(TestCase):
         self._warm_up_URL_reversing_cache() # Don't pay the cost of warming
                                             # the cache during the tests!
 
-        old_template_source_loaders = default_engine._template_source_loaders
+        old_template_source_loaders = get_default_engine()._template_source_loaders
         old_td = settings.TEMPLATE_DEBUG
         old_invalid = settings.TEMPLATE_STRING_IF_INVALID
         old_allowed_include_roots = settings.ALLOWED_INCLUDE_ROOTS
@@ -431,7 +431,7 @@ class SmallTests(TestCase):
                     failures.extend(new_failures)
 
         deactivate() # just to be on the safe side
-        assert default_engine._template_source_loaders == old_template_source_loaders
+        assert get_default_engine()._template_source_loaders == old_template_source_loaders
         assert settings.TEMPLATE_DEBUG == old_td
         assert settings.TEMPLATE_STRING_IF_INVALID == old_invalid
         assert settings.ALLOWED_INCLUDE_ROOTS == old_allowed_include_roots

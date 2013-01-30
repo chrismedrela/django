@@ -5,7 +5,7 @@ from xml.dom.minidom import parseString, Node
 from django.conf import settings, UserSettingsHolder
 from django.core import mail
 from django.test.signals import template_rendered, setting_changed
-from django.template import _Template, loader, TemplateDoesNotExist, default_engine
+from django.template import _Template, loader, TemplateDoesNotExist, get_default_engine
 from django.template.loaders import cached
 from django.utils.translation import deactivate
 from django.utils.functional import wraps
@@ -155,8 +155,8 @@ def setup_test_template_loader(templates_dict, use_cached_loader=False):
     else:
         template_loader = test_template_loader
 
-    setattr(loader, RESTORE_LOADERS_ATTR, default_engine._template_source_loaders)
-    default_engine._template_source_loaders = (template_loader,)
+    setattr(loader, RESTORE_LOADERS_ATTR, get_default_engine()._template_source_loaders)
+    get_default_engine()._template_source_loaders = (template_loader,)
     return template_loader
 
 
@@ -165,7 +165,7 @@ def restore_template_loaders():
     Restores the original template loaders after
     :meth:`setup_test_template_loader` has been run.
     """
-    default_engine._template_source_loaders = getattr(loader, RESTORE_LOADERS_ATTR)
+    get_default_engine()._template_source_loaders = getattr(loader, RESTORE_LOADERS_ATTR)
     delattr(loader, RESTORE_LOADERS_ATTR)
 
 
