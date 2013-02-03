@@ -1300,9 +1300,14 @@ class TemplateEngine(object):
         self._libraries = {}
         # If loaders == None then the loaders will be collected basing on
         # settings module on the first call of self.find_template.
-        self._template_source_loaders = loaders
+        self._template_source_loaders = None
         # global list of libraries to load by default for a new parser
         self._builtins = []
+        if loaders is not None:
+            self.set_loaders(loaders)
+
+    def set_loaders(self, loaders):
+        self._template_source_loaders = tuple(loaders)
 
     def get_library(self, library_name):
         # OLD COMMENT FIXME

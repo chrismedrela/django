@@ -26,7 +26,7 @@
 # installed, because pkg_resources is necessary to read eggs.
 
 from django.core.exceptions import ImproperlyConfigured
-from django.template.base import (Origin, Template, Context,
+from django.template.base import (Template, Context,
     TemplateDoesNotExist, get_default_engine, make_origin)
 from django.utils.importlib import import_module
 from django.conf import settings
@@ -35,15 +35,16 @@ from django.utils import six
 class BaseLoader(object):
     is_usable = False
 
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(self, engine=None, *args, **kwargs):
+        self.engine = engine or get_default_engine()
 
     def __call__(self, template_name, template_dirs=None):
         return self.load_template(template_name, template_dirs)
 
     def load_template(self, template_name, template_dirs=None):
         source, display_name = self.load_template_source(template_name, template_dirs)
-        origin = make_origin(display_name, self.load_template_source, template_name, template_dirs)
+        origin = make_origin(display_name, self.load_template_source,
+                             template_name, template_dirs)
         return source, display_name
 
     def load_template_source(self, template_name, template_dirs=None):
