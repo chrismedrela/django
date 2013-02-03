@@ -9,11 +9,12 @@ from .templatetags import custom
 
 class CustomFilterTests(TestCase):
     def test_filter(self):
-        t = template.Template("{% load custom %}{{ string|trim:5 }}")
-        self.assertEqual(
-            t.render(template.Context({"string": "abcdefghijklmnopqrstuvwxyz"})),
-            "abcde"
-        )
+        engine = template.TemplateEngineWithBuiltins()
+        engine.add_library('custom', custom.register)
+        t = template._Template(engine, "{% load custom %}{{ string|trim:5 }}")
+        context = template.Context({"string": "abcdefghijklmnopqrstuvwxyz"})
+        output = t.render(context)
+        self.assertEqual(output, "abcde")
 
 
 class CustomTagTests(TestCase):
