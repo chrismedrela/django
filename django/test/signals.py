@@ -79,3 +79,9 @@ def file_storage_changed(**kwargs):
     if kwargs['setting'] in ('MEDIA_ROOT', 'DEFAULT_FILE_STORAGE'):
         from django.core.files.storage import default_storage
         default_storage._wrapped = empty
+
+@receiver(setting_changed)
+def invalidate_default_engine(**kwargs):
+    if kwargs['setting'] == 'TEMPLATE_LOADERS':
+        from django import template
+        template.invalidate_default_engine()

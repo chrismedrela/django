@@ -1199,13 +1199,13 @@ class Library(object):
                     _dict = func(*resolved_args, **resolved_kwargs)
 
                     if not getattr(self, 'nodelist', False):
-                        from django.template.loader import get_template, select_template
                         if isinstance(file_name, _Template):
                             t = file_name
-                        elif not isinstance(file_name, six.string_types) and is_iterable(file_name):
-                            t = select_template(file_name)
+                        elif (not isinstance(file_name, six.string_types) and
+                              is_iterable(file_name)):
+                            t = self.engine.select_template(file_name)
                         else:
-                            t = get_template(file_name)
+                            t = self.engine.get_template(file_name)
                         self.nodelist = t.nodelist
                     new_context = context_class(_dict, **{
                         'autoescape': context.autoescape,
@@ -1380,6 +1380,9 @@ class TemplateEngine(object):
                 return template, origin
         raise TemplateDoesNotExist(name)
 
+    def get_template(self, name):
+        return self.find_template(name)[0]
+
     def select_template(self, template_names):
         """ Given a list of template names, returns the first that can be
         loaded. """
@@ -1481,3 +1484,7 @@ def get_default_engine():
         _default_engine.add_to_builtins('django.template.defaultfilters')
         _default_engine.add_to_builtins('django.template.loader_tags')
     return _default_engine
+
+def invalidate_default_engine():
+    global _default_engine
+    _default_engine = None
