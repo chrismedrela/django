@@ -10,7 +10,7 @@ from .templatetags import custom
 class CustomFilterTests(TestCase):
     def test_filter(self):
         engine = template.TemplateEngineWithBuiltins()
-        engine.add_library('custom', custom.register)
+        engine.add_library('custom', custom.get_templatetags(engine))
         t = template._Template(engine, "{% load custom %}{{ string|trim:5 }}")
         context = template.Context({"string": "abcdefghijklmnopqrstuvwxyz"})
         output = t.render(context)
@@ -24,72 +24,74 @@ class CustomTagTests(TestCase):
         self.assertEqual(tag.__dict__['anything'], 'Expected %s __dict__' % name)
 
     def test_simple_tags(self):
+        engine = template.TemplateEngineWithBuiltins()
+        engine.add_library('custom', custom.get_templatetags(engine))
         c = template.Context({'value': 42})
 
-        t = template.Template('{% load custom %}{% no_params %}')
+        t = template._Template(engine, '{% load custom %}{% no_params %}')
         self.assertEqual(t.render(c), 'no_params - Expected result')
 
-        t = template.Template('{% load custom %}{% one_param 37 %}')
+        t = template._Template(engine, '{% load custom %}{% one_param 37 %}')
         self.assertEqual(t.render(c), 'one_param - Expected result: 37')
 
-        t = template.Template('{% load custom %}{% explicit_no_context 37 %}')
+        t = template._Template(engine, '{% load custom %}{% explicit_no_context 37 %}')
         self.assertEqual(t.render(c), 'explicit_no_context - Expected result: 37')
 
-        t = template.Template('{% load custom %}{% no_params_with_context %}')
+        t = template._Template(engine, '{% load custom %}{% no_params_with_context %}')
         self.assertEqual(t.render(c), 'no_params_with_context - Expected result (context value: 42)')
 
-        t = template.Template('{% load custom %}{% params_and_context 37 %}')
+        t = template._Template(engine, '{% load custom %}{% params_and_context 37 %}')
         self.assertEqual(t.render(c), 'params_and_context - Expected result (context value: 42): 37')
 
-        t = template.Template('{% load custom %}{% simple_two_params 37 42 %}')
+        t = template._Template(engine, '{% load custom %}{% simple_two_params 37 42 %}')
         self.assertEqual(t.render(c), 'simple_two_params - Expected result: 37, 42')
 
-        t = template.Template('{% load custom %}{% simple_one_default 37 %}')
+        t = template._Template(engine, '{% load custom %}{% simple_one_default 37 %}')
         self.assertEqual(t.render(c), 'simple_one_default - Expected result: 37, hi')
 
-        t = template.Template('{% load custom %}{% simple_one_default 37 two="hello" %}')
+        t = template._Template(engine, '{% load custom %}{% simple_one_default 37 two="hello" %}')
         self.assertEqual(t.render(c), 'simple_one_default - Expected result: 37, hello')
 
-        t = template.Template('{% load custom %}{% simple_one_default one=99 two="hello" %}')
+        t = template._Template(engine, '{% load custom %}{% simple_one_default one=99 two="hello" %}')
         self.assertEqual(t.render(c), 'simple_one_default - Expected result: 99, hello')
 
         six.assertRaisesRegex(self, template.TemplateSyntaxError,
             "'simple_one_default' received unexpected keyword argument 'three'",
             template.Template, '{% load custom %}{% simple_one_default 99 two="hello" three="foo" %}')
 
-        t = template.Template('{% load custom %}{% simple_one_default 37 42 %}')
+        t = template._Template(engine, '{% load custom %}{% simple_one_default 37 42 %}')
         self.assertEqual(t.render(c), 'simple_one_default - Expected result: 37, 42')
 
-        t = template.Template('{% load custom %}{% simple_unlimited_args 37 %}')
+        t = template._Template(engine, '{% load custom %}{% simple_unlimited_args 37 %}')
         self.assertEqual(t.render(c), 'simple_unlimited_args - Expected result: 37, hi')
 
-        t = template.Template('{% load custom %}{% simple_unlimited_args 37 42 56 89 %}')
+        t = template._Template(engine, '{% load custom %}{% simple_unlimited_args 37 42 56 89 %}')
         self.assertEqual(t.render(c), 'simple_unlimited_args - Expected result: 37, 42, 56, 89')
 
-        t = template.Template('{% load custom %}{% simple_only_unlimited_args %}')
+        t = template._Template(engine, '{% load custom %}{% simple_only_unlimited_args %}')
         self.assertEqual(t.render(c), 'simple_only_unlimited_args - Expected result: ')
 
-        t = template.Template('{% load custom %}{% simple_only_unlimited_args 37 42 56 89 %}')
+        t = template._Template(engine, '{% load custom %}{% simple_only_unlimited_args 37 42 56 89 %}')
         self.assertEqual(t.render(c), 'simple_only_unlimited_args - Expected result: 37, 42, 56, 89')
 
         six.assertRaisesRegex(self, template.TemplateSyntaxError,
             "'simple_two_params' received too many positional arguments",
-            template.Template, '{% load custom %}{% simple_two_params 37 42 56 %}')
+            template._Template, engine, '{% load custom %}{% simple_two_params 37 42 56 %}')
 
         six.assertRaisesRegex(self, template.TemplateSyntaxError,
             "'simple_one_default' received too many positional arguments",
-            template.Template, '{% load custom %}{% simple_one_default 37 42 56 %}')
+            template._Template, engine, '{% load custom %}{% simple_one_default 37 42 56 %}')
 
-        t = template.Template('{% load custom %}{% simple_unlimited_args_kwargs 37 40|add:2 56 eggs="scrambled" four=1|add:3 %}')
+        t = template._Template(engine, '{% load custom %}{% simple_unlimited_args_kwargs 37 40|add:2 56 eggs="scrambled" four=1|add:3 %}')
         self.assertEqual(t.render(c), 'simple_unlimited_args_kwargs - Expected result: 37, 42, 56 / eggs=scrambled, four=4')
 
         six.assertRaisesRegex(self, template.TemplateSyntaxError,
             "'simple_unlimited_args_kwargs' received some positional argument\(s\) after some keyword argument\(s\)",
-            template.Template, '{% load custom %}{% simple_unlimited_args_kwargs 37 40|add:2 eggs="scrambled" 56 four=1|add:3 %}')
+            template._Template, engine, '{% load custom %}{% simple_unlimited_args_kwargs 37 40|add:2 eggs="scrambled" 56 four=1|add:3 %}')
 
         six.assertRaisesRegex(self, template.TemplateSyntaxError,
             "'simple_unlimited_args_kwargs' received multiple values for keyword argument 'eggs'",
-            template.Template, '{% load custom %}{% simple_unlimited_args_kwargs 37 eggs="scrambled" eggs="scrambled" %}')
+            template._Template, engine, '{% load custom %}{% simple_unlimited_args_kwargs 37 eggs="scrambled" eggs="scrambled" %}')
 
     def test_simple_tag_registration(self):
         # Test that the decorators preserve the decorated function's docstring, name and attributes.
@@ -345,7 +347,7 @@ class CustomTagTests(TestCase):
             "'assignment_unlimited_args' did not receive value\(s\) for the argument\(s\): 'one'",
             template.Template, '{% load custom %}{% assignment_unlimited_args as var %}The result is: {{ var }}')
 
-        t = template.Template('{% load custom %}{% assignment_unlimited_args_kwargs 37 40|add:2 56 eggs="scrambled" four=1|add:3 as var %}The result is: {{ var }}')
+        t = template._Template(engine, '{% load custom %}{% assignment_unlimited_args_kwargs 37 40|add:2 56 eggs="scrambled" four=1|add:3 as var %}The result is: {{ var }}')
         self.assertEqual(t.render(c), 'The result is: assignment_unlimited_args_kwargs - Expected result: 37, 42, 56 / eggs=scrambled, four=4')
 
         six.assertRaisesRegex(self, template.TemplateSyntaxError,
