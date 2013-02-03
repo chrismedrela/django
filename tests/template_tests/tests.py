@@ -212,8 +212,9 @@ class Templates(TestCase):
     # the compiled templates.
     @override_settings(TEMPLATE_DEBUG=True)
     def test_loader_debug_origin(self):
-        loaders = (filesystem.Loader(),)
-        engine = template.TemplateEngineWithBuiltins(loaders)
+        engine = template.TemplateEngineWithBuiltins()
+        loader = filesystem.Loader(engine)
+        engine.set_loaders([loader])
 
         # We rely on the fact that runtests.py sets up TEMPLATE_DIRS to
         # point to a directory containing a login.html file. Also that
@@ -228,9 +229,10 @@ class Templates(TestCase):
             'for debug page: %s' % template_name)
 
         # Also test the cached loader, since it overrides load_template
-        cache_loader = cached.Loader(('',))
-        cache_loader._cached_loaders = engine._template_source_loaders
-        engine._template_source_loaders = (cache_loader,)
+        engine = template.TemplateEngineWithBuiltins()
+        cache_loader = cached.Loader([], engine)
+        cache_loader._cached_loaders = [loader]
+        engine.set_loaders([cache_loader])
 
         tmpl = engine.find_template(load_name)[0]
         template_name = tmpl.nodelist[0].source[0].name
@@ -303,9 +305,11 @@ class Templates(TestCase):
 
         """
 
-        cache_loader = cached.Loader(('',))
-        cache_loader._cached_loaders = (app_directories.Loader(),)
-        engine = template.TemplateEngineWithBuiltins((cache_loader,))
+        engine = template.TemplateEngineWithBuiltins()
+        loader = app_directories.Loader(engine)
+        cache_loader = cached.Loader(('',), engine)
+        cache_loader._cached_loaders = (loader,)
+        engine.set_loaders([cache_loader])
 
         load_name = 'test_extends_error.html'
         tmpl = engine.find_template(load_name)[0]
@@ -507,9 +511,10 @@ class SmallTests(TestCase):
 
     def _create_cache_loader_and_engine(self, templates):
         dict_loader = DictionaryLoader(templates)
-        cache_loader = cached.Loader(('fake loader',))
+        engine = template.TemplateEngineWithBuiltins()
+        cache_loader = cached.Loader(('fake loader',), engine)
         cache_loader._cached_loaders = (dict_loader,)
-        engine = template.TemplateEngineWithBuiltins([cache_loader])
+        engine.set_loaders([cache_loader])
         engine.add_library('testtags', self._get_library_of_custom_template_tags())
         return cache_loader, engine
 
