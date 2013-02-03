@@ -1307,10 +1307,11 @@ def add_to_builtins(module):
 
 
 class TemplateEngine(object):
+    """ You have to pass loaders to __init__ or set_loaders before first use. """
+
     def __init__(self, loaders=None):
         self._libraries = {}
-        # If loaders == None then the loaders will be collected basing on
-        # settings module on the first call of self.find_template.
+        # None means that building this object is not finished
         self._template_source_loaders = None
         # global list of libraries to load by default for a new parser
         self._builtins = []
@@ -1367,9 +1368,6 @@ class TemplateEngine(object):
     def find_template(self, name, dirs=None):
         """ Returns tuple of _Template instance and origin. """
 
-        if self._template_source_loaders is None:
-            self._template_source_loaders = _calculate_template_source_loaders()
-
         for loader in self._template_source_loaders:
             try:
                 template, display_name = loader(name, dirs)
@@ -1423,11 +1421,12 @@ def TemplateEngineWithBuiltins(*args, **kwargs):
         engine.add_to_builtins(import_library(builtin))
     return engine
 
-def find_template_loader(loader):
+def find_template_loader(loader, engine):
     if isinstance(loader, (tuple, list)):
-        loader, args = loader[0], loader[1:]
+        loader, args = loader[0], list(loader[1:])
     else:
         args = []
+
     if isinstance(loader, six.string_types):
         module, attr = loader.rsplit('.', 1)
         try:
@@ -1440,9 +1439,9 @@ def find_template_loader(loader):
             raise ImproperlyConfigured('Error importing template source loader %s: "%s"' % (loader, e))
 
         if hasattr(TemplateLoader, 'load_template_source'):
-            func = TemplateLoader(*args)
+            func = TemplateLoader(*args, engine=engine)
+
         else:
-            # Try loading module the old way - string is full path to callable
             if args:
                 raise ImproperlyConfigured("Error importing template source loader %s - can't pass arguments to function-based loader." % loader)
             func = TemplateLoader
@@ -1462,14 +1461,15 @@ def make_origin(display_name, loader, name, dirs):
     else:
         return None
 
-def _calculate_template_source_loaders():
+
+def _calculate_template_source_loaders(engine):
     # Warning! Don't call while the module is being importing. Calculating
     # loaders at the time of importing module may cause circular import
     # errors. See Django ticket #1292.
 
     loaders = []
     for loader_name in settings.TEMPLATE_LOADERS:
-        loader = find_template_loader(loader_name)
+        loader = find_template_loader(loader_name, engine)
         if loader is not None:
             loaders.append(loader)
     return tuple(loaders)
@@ -1479,6 +1479,8 @@ def get_default_engine():
     global _default_engine
     if _default_engine is None:
         _default_engine = TemplateEngine()
+        loaders = _calculate_template_source_loaders(_default_engine)
+        _default_engine.set_loaders(loaders)
         _default_engine.add_to_builtins('django.template.defaulttags')
         _default_engine.add_to_builtins('django.template.defaultfilters')
         _default_engine.add_to_builtins('django.template.loader_tags')
