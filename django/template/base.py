@@ -1393,6 +1393,9 @@ class TemplateEngine(object):
             library = import_library(library)
         self._builtins.append(library)
 
+    def add_library(self, name, library):
+        self._libraries[name] = library
+
     def get_template_source_loaders(self):
         return self._template_source_loaders
 

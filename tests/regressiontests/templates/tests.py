@@ -467,7 +467,7 @@ class SmallTests(TestCase):
         cache_loader = cached.Loader(('fake loader',), engine)
         cache_loader._cached_loaders = (dict_loader,)
         engine.set_loaders([cache_loader])
-        engine._libraries['testtags'] = self._get_library_of_custom_template_tags()
+        engine.add_library('testtags', self._get_library_of_custom_template_tags())
         return cache_loader, engine
 
     def _get_library_of_custom_template_tags(self):
