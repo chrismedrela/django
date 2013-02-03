@@ -78,6 +78,6 @@ from django.template.base import (Library, add_to_builtins, get_library,
 
 # Engine
 from django.template.base import (get_default_engine, TemplateEngine,
-    TemplateEngineWithBuiltins)
+    TemplateEngineWithBuiltins, invalidate_default_engine)
 
 __all__ = ('Template', 'Context', 'RequestContext', 'compile_string')
