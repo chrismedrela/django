@@ -221,7 +221,7 @@ class Templates(TestCase):
             'for debug page: %s' % template_name)
 
         # Also test the cached loader, since it overrides load_template
-        cache_loader = cached.Loader(('',))
+        cache_loader = cached.Loader(('fake',))
         cache_loader._cached_loaders = engine._template_source_loaders
         engine._template_source_loaders = (cache_loader,)
 

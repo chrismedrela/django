@@ -4,7 +4,8 @@ to load templates from them in order, caching the result.
 """
 
 import hashlib
-from django.template.base import TemplateDoesNotExist, make_origin, _Template
+from django.template.base import (TemplateDoesNotExist, make_origin, _Template,
+    find_template_loader)
 from django.template.loader import BaseLoader, get_template_from_string
 
 class Loader(BaseLoader):
@@ -24,7 +25,7 @@ class Loader(BaseLoader):
             # could see an incomplete list. See #17303.
             cached_loaders = []
             for loader in self._loaders:
-                cached_loaders.append(find_template_loader(loader))
+                cached_loaders.append(find_template_loader(loader, self.engine))
             self._cached_loaders = cached_loaders
         return self._cached_loaders
 
