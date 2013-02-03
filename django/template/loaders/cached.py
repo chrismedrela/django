@@ -28,7 +28,7 @@ class Loader(BaseLoader):
             # could see an incomplete list. See #17303.
             cached_loaders = []
             for loader in self._loaders:
-                cached_loaders.append(find_template_loader(loader))
+                cached_loaders.append(find_template_loader(loader, self.engine))
             self._cached_loaders = cached_loaders
         return self._cached_loaders
 
