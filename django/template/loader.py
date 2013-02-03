@@ -31,8 +31,8 @@ from django.template.base import Template, Context, get_default_engine
 class BaseLoader(object):
     is_usable = False
 
-    def __init__(self, *args, **kwargs):
-        pass
+    def __init__(self, engine=None, *args, **kwargs):
+        self.engine = engine or get_default_engine()
 
     def __call__(self, template_name, template_dirs=None):
         return self.load_template(template_name, template_dirs)
