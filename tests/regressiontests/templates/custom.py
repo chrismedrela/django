@@ -18,91 +18,96 @@ class CustomFilterTests(TestCase):
 
 
 class CustomTagTests(TestCase):
-    def verify_tag(self, tag, name):
-        self.assertEqual(tag.__name__, name)
-        self.assertEqual(tag.__doc__, 'Expected %s __doc__' % name)
-        self.assertEqual(tag.__dict__['anything'], 'Expected %s __dict__' % name)
-
     def setUp(self):
         self.engine = template.TemplateEngineWithBuiltins()
         self.engine.add_library('custom', custom.get_templatetags(self.engine))
 
+    def assert_render(self, template_content, expected_output):
+        t = template._Template(self.engine, template_content)
+        context = template.Context({'value': 42})
+        self.assertEqual(t.render(context), expected_output)
+
+    def assert_compilation_failes(self, template_content, error_message_regex):
+        six.assertRaisesRegex(self, template.TemplateSyntaxError,
+            error_message_regex,
+            template._Template, self.engine, template_content)
+
     def test_simple_tags(self):
-        def test(template_content, expected_output):
-            t = template._Template(self.engine, template_content)
-            context = template.Context({'value': 42})
-            self.assertEqual(t.render(context), expected_output)
+        tests = [
+            ('{% load custom %}{% no_params %}',
+             'no_params - Expected result'),
 
-        def raises(template_content, error_message_regex):
-            six.assertRaisesRegex(self, template.TemplateSyntaxError,
-                error_message_regex,
-                template._Template, self.engine, template_content)
+            ('{% load custom %}{% one_param 37 %}',
+             'one_param - Expected result: 37'),
 
-        test('{% load custom %}{% no_params %}',
-             'no_params - Expected result')
+            ('{% load custom %}{% explicit_no_context 37 %}',
+             'explicit_no_context - Expected result: 37'),
 
-        test('{% load custom %}{% one_param 37 %}',
-             'one_param - Expected result: 37')
+            ('{% load custom %}{% no_params_with_context %}',
+             'no_params_with_context - Expected result (context value: 42)'),
 
-        test('{% load custom %}{% explicit_no_context 37 %}',
-             'explicit_no_context - Expected result: 37')
+            ('{% load custom %}{% params_and_context 37 %}',
+             'params_and_context - Expected result (context value: 42): 37'),
 
-        test('{% load custom %}{% no_params_with_context %}',
-             'no_params_with_context - Expected result (context value: 42)')
+            ('{% load custom %}{% simple_two_params 37 42 %}',
+             'simple_two_params - Expected result: 37, 42'),
 
-        test('{% load custom %}{% params_and_context 37 %}',
-             'params_and_context - Expected result (context value: 42): 37')
+            ('{% load custom %}{% simple_one_default 37 %}',
+             'simple_one_default - Expected result: 37, hi'),
 
-        test('{% load custom %}{% simple_two_params 37 42 %}',
-             'simple_two_params - Expected result: 37, 42')
+            ('{% load custom %}{% simple_one_default 37 two="hello" %}',
+             'simple_one_default - Expected result: 37, hello'),
 
-        test('{% load custom %}{% simple_one_default 37 %}',
-             'simple_one_default - Expected result: 37, hi')
+            ('{% load custom %}{% simple_one_default one=99 two="hello" %}',
+             'simple_one_default - Expected result: 99, hello'),
 
-        test('{% load custom %}{% simple_one_default 37 two="hello" %}',
-             'simple_one_default - Expected result: 37, hello')
+            ('{% load custom %}{% simple_one_default 37 42 %}',
+             'simple_one_default - Expected result: 37, 42'),
 
-        test('{% load custom %}{% simple_one_default one=99 two="hello" %}',
-             'simple_one_default - Expected result: 99, hello')
+            ('{% load custom %}{% simple_unlimited_args 37 %}',
+             'simple_unlimited_args - Expected result: 37, hi'),
 
-        raises('{% load custom %}{% simple_one_default 99 two="hello" three="foo" %}',
-               "'simple_one_default' received unexpected keyword argument 'three'")
+            ('{% load custom %}{% simple_unlimited_args 37 42 56 89 %}',
+             'simple_unlimited_args - Expected result: 37, 42, 56, 89'),
 
-        test('{% load custom %}{% simple_one_default 37 42 %}',
-             'simple_one_default - Expected result: 37, 42')
+            ('{% load custom %}{% simple_only_unlimited_args %}',
+             'simple_only_unlimited_args - Expected result: '),
 
-        test('{% load custom %}{% simple_unlimited_args 37 %}',
-             'simple_unlimited_args - Expected result: 37, hi')
+            ('{% load custom %}{% simple_only_unlimited_args 37 42 56 89 %}',
+             'simple_only_unlimited_args - Expected result: 37, 42, 56, 89'),
 
-        test('{% load custom %}{% simple_unlimited_args 37 42 56 89 %}',
-             'simple_unlimited_args - Expected result: 37, 42, 56, 89')
-
-        test('{% load custom %}{% simple_only_unlimited_args %}',
-             'simple_only_unlimited_args - Expected result: ')
-
-        test('{% load custom %}{% simple_only_unlimited_args 37 42 56 89 %}',
-             'simple_only_unlimited_args - Expected result: 37, 42, 56, 89')
-
-        raises('{% load custom %}{% simple_two_params 37 42 56 %}',
-               "'simple_two_params' received too many positional arguments")
-
-        raises('{% load custom %}{% simple_one_default 37 42 56 %}',
-               "'simple_one_default' received too many positional arguments")
-
-        test('{% load custom %}{% simple_unlimited_args_kwargs '
+            ('{% load custom %}{% simple_unlimited_args_kwargs '
              '37 40|add:2 56 eggs="scrambled" four=1|add:3 %}',
              'simple_unlimited_args_kwargs - Expected result: '
-             '37, 42, 56 / eggs=scrambled, four=4')
+             '37, 42, 56 / eggs=scrambled, four=4'),
+        ]
 
-        raises('{% load custom %}{% simple_unlimited_args_kwargs '
-               '37 40|add:2 eggs="scrambled" 56 four=1|add:3 %}',
-               "'simple_unlimited_args_kwargs' received some positional "
-               "argument\(s\) after some keyword argument\(s\)")
+        for template_content, expected_output in tests:
+            self.assert_render(template_content, expected_output)
 
-        raises('{% load custom %}{% simple_unlimited_args_kwargs '
-               '37 eggs="scrambled" eggs="scrambled" %}',
-               "'simple_unlimited_args_kwargs' received multiple values "
-               "for keyword argument 'eggs'")
+        tests = [
+            ('{% load custom %}{% simple_one_default 99 two="hello" three="foo" %}',
+             "'simple_one_default' received unexpected keyword argument 'three'"),
+
+            ('{% load custom %}{% simple_two_params 37 42 56 %}',
+             "'simple_two_params' received too many positional arguments"),
+
+            ('{% load custom %}{% simple_one_default 37 42 56 %}',
+             "'simple_one_default' received too many positional arguments"),
+
+            ('{% load custom %}{% simple_unlimited_args_kwargs '
+             '37 40|add:2 eggs="scrambled" 56 four=1|add:3 %}',
+             "'simple_unlimited_args_kwargs' received some positional "
+             "argument\(s\) after some keyword argument\(s\)"),
+
+            ('{% load custom %}{% simple_unlimited_args_kwargs '
+             '37 eggs="scrambled" eggs="scrambled" %}',
+             "'simple_unlimited_args_kwargs' received multiple values "
+             "for keyword argument 'eggs'"),
+        ]
+
+        for template_content, error_message_regex in tests:
+            self.assert_compilation_failes(template_content, error_message_regex)
 
     def test_simple_tag_registration(self):
         # Test that the decorators preserve the decorated function's docstring, name and attributes.
@@ -113,6 +118,11 @@ class CustomTagTests(TestCase):
         self.verify_tag(custom.params_and_context, 'params_and_context')
         self.verify_tag(custom.simple_unlimited_args_kwargs, 'simple_unlimited_args_kwargs')
         self.verify_tag(custom.simple_tag_without_context_parameter, 'simple_tag_without_context_parameter')
+
+    def verify_tag(self, tag, name):
+        self.assertEqual(tag.__name__, name)
+        self.assertEqual(tag.__doc__, 'Expected %s __doc__' % name)
+        self.assertEqual(tag.__dict__['anything'], 'Expected %s __dict__' % name)
 
     def test_simple_tag_missing_context(self):
         # The 'context' parameter must be present when takes_context is True
