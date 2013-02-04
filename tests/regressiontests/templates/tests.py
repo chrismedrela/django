@@ -419,11 +419,6 @@ class SmallTests(TestCase):
         self._warm_up_URL_reversing_cache() # Don't pay the cost of warming
                                             # the cache during the tests!
 
-        old_template_source_loaders = get_default_engine()._template_source_loaders
-        old_td = settings.TEMPLATE_DEBUG
-        old_invalid = settings.TEMPLATE_STRING_IF_INVALID
-        old_allowed_include_roots = settings.ALLOWED_INCLUDE_ROOTS
-
         failures = []
 
         # Set ALLOWED_INCLUDE_ROOTS so that ssi works.
@@ -436,10 +431,6 @@ class SmallTests(TestCase):
                     failures.extend(new_failures)
 
         deactivate() # just to be on the safe side
-        assert get_default_engine()._template_source_loaders == old_template_source_loaders
-        assert settings.TEMPLATE_DEBUG == old_td
-        assert settings.TEMPLATE_STRING_IF_INVALID == old_invalid
-        assert settings.ALLOWED_INCLUDE_ROOTS == old_allowed_include_roots
 
         # generate and print raport
         self._assert_no_failures(failures)
