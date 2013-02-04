@@ -22,9 +22,9 @@ class CustomTagTests(TestCase):
         self.engine = template.TemplateEngineWithBuiltins()
         self.engine.add_library('custom', custom.get_templatetags(self.engine))
 
-    def assert_render(self, template_content, expected_output):
+    def assert_render(self, template_content, expected_output, context=None):
         t = template._Template(self.engine, template_content)
-        context = template.Context({'value': 42})
+        context = context or template.Context({'value': 42})
         self.assertEqual(t.render(context), expected_output)
 
     def assert_compilation_failes(self, template_content, error_message_regex):
@@ -297,16 +297,15 @@ class CustomTagTests(TestCase):
         self.verify_tag(custom.inclusion_unlimited_args_kwargs, 'inclusion_unlimited_args_kwargs')
 
     def test_15070_current_app(self):
-        """
-        Test that inclusion tag passes down `current_app` of context to the
-        Context of the included/rendered template as well.
-        """
-        c = template.Context({})
-        t = template.Template('{% load custom %}{% inclusion_tag_current_app %}')
-        self.assertEqual(t.render(c).strip(), 'None')
+        """ Test that inclusion tag passes down `current_app` of context to
+        the Context of the included/rendered template as well. """
 
-        c.current_app = 'advanced'
-        self.assertEqual(t.render(c).strip(), 'advanced')
+        context = template.Context({})
+        template_source = '{% load custom %}{% inclusion_tag_current_app %}'
+        self.assert_render(template_source, 'None\n', context)
+
+        context.current_app = 'advanced'
+        self.assert_render(template_source, 'advanced\n', context)
 
     def test_15070_use_l10n(self):
         """
