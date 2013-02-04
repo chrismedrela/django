@@ -226,43 +226,59 @@ class CustomTagTests(TestCase):
             "with takes_context=True so it must have a first argument of 'context'")
 
     def test_inclusion_tags_from_template(self):
-        c = template.Context({'value': 42})
+        tests = [
+            ('{% load custom %}{% inclusion_no_params_from_template %}',
+             'inclusion_no_params_from_template - '
+             'Expected result\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_no_params_from_template %}')
-        self.assertEqual(t.render(c), 'inclusion_no_params_from_template - Expected result\n')
+            ('{% load custom %}{% inclusion_one_param_from_template 37 %}',
+             'inclusion_one_param_from_template - '
+             'Expected result: 37\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_one_param_from_template 37 %}')
-        self.assertEqual(t.render(c), 'inclusion_one_param_from_template - Expected result: 37\n')
+            ('{% load custom %}{% inclusion_explicit_no_context_from_template 37 %}',
+             'inclusion_explicit_no_context_from_template - '
+             'Expected result: 37\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_explicit_no_context_from_template 37 %}')
-        self.assertEqual(t.render(c), 'inclusion_explicit_no_context_from_template - Expected result: 37\n')
+            ('{% load custom %}{% inclusion_no_params_with_context_from_template %}',
+             'inclusion_no_params_with_context_from_template - '
+             'Expected result (context value: 42)\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_no_params_with_context_from_template %}')
-        self.assertEqual(t.render(c), 'inclusion_no_params_with_context_from_template - Expected result (context value: 42)\n')
+            ('{% load custom %}{% inclusion_params_and_context_from_template 37 %}',
+             'inclusion_params_and_context_from_template - '
+             'Expected result (context value: 42): 37\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_params_and_context_from_template 37 %}')
-        self.assertEqual(t.render(c), 'inclusion_params_and_context_from_template - Expected result (context value: 42): 37\n')
+            ('{% load custom %}{% inclusion_two_params_from_template 37 42 %}',
+             'inclusion_two_params_from_template - '
+             'Expected result: 37, 42\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_two_params_from_template 37 42 %}')
-        self.assertEqual(t.render(c), 'inclusion_two_params_from_template - Expected result: 37, 42\n')
+            ('{% load custom %}{% inclusion_one_default_from_template 37 %}',
+             'inclusion_one_default_from_template - '
+             'Expected result: 37, hi\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_one_default_from_template 37 %}')
-        self.assertEqual(t.render(c), 'inclusion_one_default_from_template - Expected result: 37, hi\n')
+            ('{% load custom %}{% inclusion_one_default_from_template 37 42 %}',
+             'inclusion_one_default_from_template - '
+             'Expected result: 37, 42\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_one_default_from_template 37 42 %}')
-        self.assertEqual(t.render(c), 'inclusion_one_default_from_template - Expected result: 37, 42\n')
+            ('{% load custom %}{% inclusion_unlimited_args_from_template 37 %}',
+             'inclusion_unlimited_args_from_template - '
+             'Expected result: 37, hi\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_unlimited_args_from_template 37 %}')
-        self.assertEqual(t.render(c), 'inclusion_unlimited_args_from_template - Expected result: 37, hi\n')
+            ('{% load custom %}{% inclusion_unlimited_args_from_template 37 42 56 89 %}',
+             'inclusion_unlimited_args_from_template - '
+             'Expected result: 37, 42, 56, 89\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_unlimited_args_from_template 37 42 56 89 %}')
-        self.assertEqual(t.render(c), 'inclusion_unlimited_args_from_template - Expected result: 37, 42, 56, 89\n')
+            ('{% load custom %}{% inclusion_only_unlimited_args_from_template %}',
+             'inclusion_only_unlimited_args_from_template - '
+             'Expected result: \n'),
 
-        t = template.Template('{% load custom %}{% inclusion_only_unlimited_args_from_template %}')
-        self.assertEqual(t.render(c), 'inclusion_only_unlimited_args_from_template - Expected result: \n')
+            ('{% load custom %}'
+             '{% inclusion_only_unlimited_args_from_template 37 42 56 89 %}',
+             'inclusion_only_unlimited_args_from_template - '
+             'Expected result: 37, 42, 56, 89\n'),
+        ]
 
-        t = template.Template('{% load custom %}{% inclusion_only_unlimited_args_from_template 37 42 56 89 %}')
-        self.assertEqual(t.render(c), 'inclusion_only_unlimited_args_from_template - Expected result: 37, 42, 56, 89\n')
+        for template_content, expected_output in tests:
+            self.assert_render(template_content, expected_output)
 
     def test_inclusion_tag_registration(self):
         # Test that the decorators preserve the decorated function's docstring, name and attributes.
