@@ -19,6 +19,7 @@ from django.template import (TemplateDoesNotExist, Context,
 from django.template.loaders import filesystem
 from django.template.loaders.eggs import Loader as EggLoader
 from django.template import loader
+from django.test import TestCase
 from django.test.utils import override_settings
 from django.utils import unittest, six
 from django.utils._os import upath
@@ -127,16 +128,10 @@ class CachedLoader(unittest.TestCase):
         self.assertNotEqual(first_template.render(Context({})),
                             second_template.render(Context({})))
 
-class RenderToStringTest(unittest.TestCase):
-
-    def setUp(self):
-        self._old_TEMPLATE_DIRS = settings.TEMPLATE_DIRS
-        settings.TEMPLATE_DIRS = (
-            os.path.join(os.path.dirname(upath(__file__)), 'templates'),
-        )
-
-    def tearDown(self):
-        settings.TEMPLATE_DIRS = self._old_TEMPLATE_DIRS
+here = os.path.dirname(upath(__file__))
+template_dirs = (os.path.join(here, 'templates'),)
+@override_settings(TEMPLATE_DIRS=template_dirs)
+class RenderToStringTest(TestCase):
 
     def test_basic(self):
         self.assertEqual(loader.render_to_string('test_context.html'), 'obj:')
