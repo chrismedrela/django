@@ -45,6 +45,7 @@ from .nodelist import NodelistTest, ErrorIndexTest
 from .smartif import SmartIfTests
 from .response import (TemplateResponseTest, CacheMiddlewareTest,
     SimpleTemplateResponseTest, CustomURLConfTest)
+from .templatetags import custom
 
 try:
     from .loaders import RenderToStringTest, EggLoaderTest
@@ -463,10 +464,12 @@ class SmallTests(TestCase):
 
     def _create_cache_loader_and_engine(self, templates):
         dict_loader = DictionaryLoader(templates)
+        app_loader = app_directories.Loader()
         engine = template.TemplateEngineWithBuiltins()
         cache_loader = cached.Loader(('fake loader',), engine)
-        cache_loader._cached_loaders = (dict_loader,)
+        cache_loader._cached_loaders = (dict_loader, app_loader)
         engine.set_loaders([cache_loader])
+        engine.add_library('custom', custom.get_templatetags(engine)['register'])
         engine.add_library('testtags', self._get_library_of_custom_template_tags())
         return cache_loader, engine
 

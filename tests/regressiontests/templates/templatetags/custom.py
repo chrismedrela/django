@@ -307,6 +307,3 @@ def get_templatetags(engine):
     assignment_tag_without_context_parameter.anything = "Expected assignment_tag_without_context_parameter __dict__"
 
     return locals()
-
-from django.template import get_default_engine
-register = get_templatetags(get_default_engine())['register']
