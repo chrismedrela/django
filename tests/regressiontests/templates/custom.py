@@ -11,6 +11,7 @@ from .templatetags import custom
 class CustomFilterTests(TestCase):
     def test_filter(self):
         engine = template.TemplateEngineWithBuiltins()
+        engine.set_loaders([app_directories.Loader()])
         custom_library = custom.get_templatetags(engine)['register']
         engine.add_library('custom', custom_library)
         t = template._Template(engine, "{% load custom %}{{ string|trim:5 }}")
@@ -22,10 +23,10 @@ class CustomFilterTests(TestCase):
 class CustomTagTests(TestCase):
     def setUp(self):
         self.engine = template.TemplateEngineWithBuiltins()
+        self.engine.set_loaders([app_directories.Loader()])
         self.custom_templatetags_map = custom.get_templatetags(self.engine)
         self.custom_library = self.custom_templatetags_map['register']
         self.engine.add_library('custom', self.custom_library)
-        self.engine.set_loaders([app_directories.Loader()])
 
     # Helper functions
 
