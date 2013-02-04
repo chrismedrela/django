@@ -132,80 +132,91 @@ class CustomTagTests(TestCase):
             "with takes_context=True so it must have a first argument of 'context'")
 
     def test_inclusion_tags(self):
-        c = template.Context({'value': 42})
+        tests = [
+            ('{% load custom %}{% inclusion_no_params %}',
+             'inclusion_no_params - Expected result\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_no_params %}')
-        self.assertEqual(t.render(c), 'inclusion_no_params - Expected result\n')
+            ('{% load custom %}{% inclusion_one_param 37 %}',
+             'inclusion_one_param - Expected result: 37\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_one_param 37 %}')
-        self.assertEqual(t.render(c), 'inclusion_one_param - Expected result: 37\n')
+            ('{% load custom %}{% inclusion_explicit_no_context 37 %}',
+             'inclusion_explicit_no_context - Expected result: 37\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_explicit_no_context 37 %}')
-        self.assertEqual(t.render(c), 'inclusion_explicit_no_context - Expected result: 37\n')
+            ('{% load custom %}{% inclusion_no_params_with_context %}',
+             'inclusion_no_params_with_context - '
+             'Expected result (context value: 42)\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_no_params_with_context %}')
-        self.assertEqual(t.render(c), 'inclusion_no_params_with_context - Expected result (context value: 42)\n')
+            ('{% load custom %}{% inclusion_params_and_context 37 %}',
+             'inclusion_params_and_context - '
+             'Expected result (context value: 42): 37\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_params_and_context 37 %}')
-        self.assertEqual(t.render(c), 'inclusion_params_and_context - Expected result (context value: 42): 37\n')
+            ('{% load custom %}{% inclusion_two_params 37 42 %}',
+             'inclusion_two_params - Expected result: 37, 42\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_two_params 37 42 %}')
-        self.assertEqual(t.render(c), 'inclusion_two_params - Expected result: 37, 42\n')
+            ('{% load custom %}{% inclusion_one_default 37 %}',
+             'inclusion_one_default - Expected result: 37, hi\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_one_default 37 %}')
-        self.assertEqual(t.render(c), 'inclusion_one_default - Expected result: 37, hi\n')
+            ('{% load custom %}{% inclusion_one_default 37 two="hello" %}',
+             'inclusion_one_default - Expected result: 37, hello\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_one_default 37 two="hello" %}')
-        self.assertEqual(t.render(c), 'inclusion_one_default - Expected result: 37, hello\n')
+            ('{% load custom %}{% inclusion_one_default one=99 two="hello" %}',
+             'inclusion_one_default - Expected result: 99, hello\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_one_default one=99 two="hello" %}')
-        self.assertEqual(t.render(c), 'inclusion_one_default - Expected result: 99, hello\n')
+            ('{% load custom %}{% inclusion_one_default 37 42 %}',
+             'inclusion_one_default - Expected result: 37, 42\n'),
 
-        six.assertRaisesRegex(self, template.TemplateSyntaxError,
-            "'inclusion_one_default' received unexpected keyword argument 'three'",
-            template.Template, '{% load custom %}{% inclusion_one_default 99 two="hello" three="foo" %}')
+            ('{% load custom %}{% inclusion_unlimited_args 37 %}',
+             'inclusion_unlimited_args - Expected result: 37, hi\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_one_default 37 42 %}')
-        self.assertEqual(t.render(c), 'inclusion_one_default - Expected result: 37, 42\n')
+            ('{% load custom %}{% inclusion_unlimited_args 37 42 56 89 %}',
+             'inclusion_unlimited_args - Expected result: 37, 42, 56, 89\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_unlimited_args 37 %}')
-        self.assertEqual(t.render(c), 'inclusion_unlimited_args - Expected result: 37, hi\n')
+            ('{% load custom %}{% inclusion_only_unlimited_args %}',
+             'inclusion_only_unlimited_args - Expected result: \n'),
 
-        t = template.Template('{% load custom %}{% inclusion_unlimited_args 37 42 56 89 %}')
-        self.assertEqual(t.render(c), 'inclusion_unlimited_args - Expected result: 37, 42, 56, 89\n')
+            ('{% load custom %}{% inclusion_only_unlimited_args 37 42 56 89 %}',
+             'inclusion_only_unlimited_args - Expected result: 37, 42, 56, 89\n'),
 
-        t = template.Template('{% load custom %}{% inclusion_only_unlimited_args %}')
-        self.assertEqual(t.render(c), 'inclusion_only_unlimited_args - Expected result: \n')
+            ('{% load custom %}{% inclusion_unlimited_args_kwargs '
+             '37 40|add:2 56 eggs="scrambled" four=1|add:3 %}',
+             'inclusion_unlimited_args_kwargs - Expected result: '
+             '37, 42, 56 / eggs=scrambled, four=4\n'),
+         ]
 
-        t = template.Template('{% load custom %}{% inclusion_only_unlimited_args 37 42 56 89 %}')
-        self.assertEqual(t.render(c), 'inclusion_only_unlimited_args - Expected result: 37, 42, 56, 89\n')
+        for template_content, expected_output in tests:
+            self.assert_render(template_content, expected_output)
 
-        six.assertRaisesRegex(self, template.TemplateSyntaxError,
-            "'inclusion_two_params' received too many positional arguments",
-            template.Template, '{% load custom %}{% inclusion_two_params 37 42 56 %}')
+        tests = [
+            ('{% load custom %}{% inclusion_one_default 99 two="hello" three="foo" %}',
+             "'inclusion_one_default' received unexpected keyword argument 'three'"),
 
-        six.assertRaisesRegex(self, template.TemplateSyntaxError,
-            "'inclusion_one_default' received too many positional arguments",
-            template.Template, '{% load custom %}{% inclusion_one_default 37 42 56 %}')
+            ('{% load custom %}{% inclusion_two_params 37 42 56 %}',
+             "'inclusion_two_params' received too many positional arguments"),
 
-        six.assertRaisesRegex(self, template.TemplateSyntaxError,
-            "'inclusion_one_default' did not receive value\(s\) for the argument\(s\): 'one'",
-            template.Template, '{% load custom %}{% inclusion_one_default %}')
+            ('{% load custom %}{% inclusion_one_default 37 42 56 %}',
+             "'inclusion_one_default' received too many positional arguments"),
 
-        six.assertRaisesRegex(self, template.TemplateSyntaxError,
-            "'inclusion_unlimited_args' did not receive value\(s\) for the argument\(s\): 'one'",
-            template.Template, '{% load custom %}{% inclusion_unlimited_args %}')
+            ('{% load custom %}{% inclusion_one_default %}',
+             "'inclusion_one_default' did not receive value\(s\) "
+             "for the argument\(s\): 'one'"),
 
-        t = template.Template('{% load custom %}{% inclusion_unlimited_args_kwargs 37 40|add:2 56 eggs="scrambled" four=1|add:3 %}')
-        self.assertEqual(t.render(c), 'inclusion_unlimited_args_kwargs - Expected result: 37, 42, 56 / eggs=scrambled, four=4\n')
+            ('{% load custom %}{% inclusion_unlimited_args %}',
+             "'inclusion_unlimited_args' did not receive value\(s\) "
+             "for the argument\(s\): 'one'"),
 
-        six.assertRaisesRegex(self, template.TemplateSyntaxError,
-            "'inclusion_unlimited_args_kwargs' received some positional argument\(s\) after some keyword argument\(s\)",
-            template.Template, '{% load custom %}{% inclusion_unlimited_args_kwargs 37 40|add:2 eggs="scrambled" 56 four=1|add:3 %}')
+            ('{% load custom %}{% inclusion_unlimited_args_kwargs '
+             '37 40|add:2 eggs="scrambled" 56 four=1|add:3 %}',
+             "'inclusion_unlimited_args_kwargs' received "
+             "some positional argument\(s\) after some keyword argument\(s\)"),
 
-        six.assertRaisesRegex(self, template.TemplateSyntaxError,
-            "'inclusion_unlimited_args_kwargs' received multiple values for keyword argument 'eggs'",
-            template.Template, '{% load custom %}{% inclusion_unlimited_args_kwargs 37 eggs="scrambled" eggs="scrambled" %}')
+            ('{% load custom %}{% inclusion_unlimited_args_kwargs '
+             '37 eggs="scrambled" eggs="scrambled" %}',
+             "'inclusion_unlimited_args_kwargs' received multiple values "
+             "for keyword argument 'eggs'"),
+        ]
+
+        for template_content, error_message_regex in tests:
+            self.assert_compilation_failes(template_content, error_message_regex)
 
     def test_include_tag_missing_context(self):
         # The 'context' parameter must be present when takes_context is True
