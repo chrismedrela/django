@@ -1016,7 +1016,7 @@ def generic_tag_compiler(parser, token, params, varargs, varkw, defaults,
     bits = token.split_contents()[1:]
     args, kwargs = parse_bits(parser, bits, params, varargs, varkw,
                               defaults, takes_context, name)
-    return node_class(takes_context, args, kwargs)
+    return node_class(takes_context, args, kwargs, parser.engine)
 
 class TagHelperNode(Node):
     """
@@ -1025,10 +1025,11 @@ class TagHelperNode(Node):
     to the decorated function.
     """
 
-    def __init__(self, takes_context, args, kwargs):
+    def __init__(self, takes_context, args, kwargs, engine):
         self.takes_context = takes_context
         self.args = args
         self.kwargs = kwargs
+        self.engine = engine
 
     def get_resolved_arguments(self, context):
         resolved_args = [var.resolve(context) for var in self.args]
@@ -1140,8 +1141,9 @@ class Library(object):
             params, varargs, varkw, defaults = getargspec(func)
 
             class AssignmentNode(TagHelperNode):
-                def __init__(self, takes_context, args, kwargs, target_var):
-                    super(AssignmentNode, self).__init__(takes_context, args, kwargs)
+                def __init__(self, takes_context, args, kwargs, engine, target_var):
+                    super(AssignmentNode, self).__init__( \
+                        takes_context, args, kwargs, engine)
                     self.target_var = target_var
 
                 def render(self, context):
@@ -1162,7 +1164,8 @@ class Library(object):
                 bits = bits[:-2]
                 args, kwargs = parse_bits(parser, bits, params,
                     varargs, varkw, defaults, takes_context, function_name)
-                return AssignmentNode(takes_context, args, kwargs, target_var)
+                return AssignmentNode(takes_context, args, kwargs,
+                                      parser.engine, target_var)
 
             compile_func.__doc__ = func.__doc__
             self.tag(function_name, compile_func)
@@ -1177,7 +1180,8 @@ class Library(object):
         else:
             raise TemplateSyntaxError("Invalid arguments provided to assignment_tag")
 
-    def inclusion_tag(self, file_name, context_class=Context, takes_context=False, name=None):
+    def inclusion_tag(self, file_name, context_class=Context,
+                      takes_context=False, name=None):
         def dec(func):
             params, varargs, varkw, defaults = getargspec(func)
 
