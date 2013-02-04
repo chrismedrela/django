@@ -1380,8 +1380,8 @@ class TemplateEngine(object):
                 return template, origin
         raise TemplateDoesNotExist(name)
 
-    def get_template(self, name):
-        return self.find_template(name)[0]
+    def get_template(self, name, dirs=None):
+        return self.find_template(name, dirs)[0]
 
     def select_template(self, template_names):
         """ Given a list of template names, returns the first that can be
