@@ -1,6 +1,7 @@
 from __future__ import absolute_import, unicode_literals
 
 from django import template
+from django.template.loaders import app_directories
 from django.utils import six
 from django.utils.unittest import TestCase
 
@@ -24,6 +25,7 @@ class CustomTagTests(TestCase):
         self.custom_templatetags_map = custom.get_templatetags(self.engine)
         self.custom_library = self.custom_templatetags_map['register']
         self.engine.add_library('custom', self.custom_library)
+        self.engine.set_loaders([app_directories.Loader()])
 
     # Helper functions
 

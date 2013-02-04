@@ -308,4 +308,5 @@ def get_templatetags(engine):
 
     return locals()
 
-register = get_templatetags(None)['register']
+from django.template import get_default_engine
+register = get_templatetags(get_default_engine())['register']
