@@ -308,16 +308,15 @@ class CustomTagTests(TestCase):
         self.assert_render(template_source, 'advanced\n', context)
 
     def test_15070_use_l10n(self):
-        """
-        Test that inclusion tag passes down `use_l10n` of context to the
-        Context of the included/rendered template as well.
-        """
-        c = template.Context({})
-        t = template.Template('{% load custom %}{% inclusion_tag_use_l10n %}')
-        self.assertEqual(t.render(c).strip(), 'None')
+        """ Test that inclusion tag passes down `use_l10n` of context to the
+        Context of the included/rendered template as well. """
 
-        c.use_l10n = True
-        self.assertEqual(t.render(c).strip(), 'True')
+        context = template.Context({})
+        template_source = '{% load custom %}{% inclusion_tag_use_l10n %}'
+        self.assert_render(template_source, 'None\n', context)
+
+        context.use_l10n = True
+        self.assert_render(template_source, 'True\n', context)
 
     def test_assignment_tags(self):
         c = template.Context({'value': 42})
