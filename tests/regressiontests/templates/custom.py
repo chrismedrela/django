@@ -471,6 +471,8 @@ class CustomTagTests(TestCase):
 
     def test_assignment_tag_missing_context(self):
         # The 'context' parameter must be present when takes_context is True
-        six.assertRaisesRegex(self, template.TemplateSyntaxError,
-            "'assignment_tag_without_context_parameter' is decorated with takes_context=True so it must have a first argument of 'context'",
-            template.Template, '{% load custom %}{% assignment_tag_without_context_parameter 123 as var %}')
+        self.assert_compilation_failes(
+            '{% load custom %}'
+            '{% assignment_tag_without_context_parameter 123 as var %}',
+            "'assignment_tag_without_context_parameter' is decorated "
+            "with takes_context=True so it must have a first argument of 'context'")
