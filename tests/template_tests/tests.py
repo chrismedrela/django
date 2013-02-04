@@ -44,7 +44,7 @@ from .response import (TemplateResponseTest, CacheMiddlewareTest,
 from .templatetags import custom
 
 try:
-    from .loaders import RenderToStringTest, EggLoaderTest
+    from .loaders import RenderToStringTest, EggLoaderTest, CachedLoader
 except ImportError as e:
     if "pkg_resources" in e.args[0]:
         pass # If setuptools isn't installed, that's fine. Just move on.
