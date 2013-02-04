@@ -10,7 +10,8 @@ from .templatetags import custom
 class CustomFilterTests(TestCase):
     def test_filter(self):
         engine = template.TemplateEngineWithBuiltins()
-        engine.add_library('custom', custom.get_templatetags(engine))
+        custom_library = custom.get_templatetags(engine)['register']
+        engine.add_library('custom', custom_library)
         t = template._Template(engine, "{% load custom %}{{ string|trim:5 }}")
         context = template.Context({"string": "abcdefghijklmnopqrstuvwxyz"})
         output = t.render(context)
@@ -20,7 +21,11 @@ class CustomFilterTests(TestCase):
 class CustomTagTests(TestCase):
     def setUp(self):
         self.engine = template.TemplateEngineWithBuiltins()
-        self.engine.add_library('custom', custom.get_templatetags(self.engine))
+        self.custom_templatetags_map = custom.get_templatetags(self.engine)
+        self.custom_library = self.custom_templatetags_map['register']
+        self.engine.add_library('custom', self.custom_library)
+
+    # Helper functions
 
     def assert_render(self, template_content, expected_output, context=None):
         t = template._Template(self.engine, template_content)
@@ -31,6 +36,14 @@ class CustomTagTests(TestCase):
         six.assertRaisesRegex(self, template.TemplateSyntaxError,
             error_message_regex,
             template._Template, self.engine, template_content)
+
+    def verify_tag(self, name):
+        tag = self.custom_templatetags_map[name]
+        self.assertEqual(tag.__name__, name)
+        self.assertEqual(tag.__doc__, 'Expected %s __doc__' % name)
+        self.assertEqual(tag.__dict__['anything'], 'Expected %s __dict__' % name)
+
+    # Tests
 
     def test_simple_tags(self):
         tests = [
@@ -110,19 +123,17 @@ class CustomTagTests(TestCase):
             self.assert_compilation_failes(template_content, error_message_regex)
 
     def test_simple_tag_registration(self):
-        # Test that the decorators preserve the decorated function's docstring, name and attributes.
-        self.verify_tag(custom.no_params, 'no_params')
-        self.verify_tag(custom.one_param, 'one_param')
-        self.verify_tag(custom.explicit_no_context, 'explicit_no_context')
-        self.verify_tag(custom.no_params_with_context, 'no_params_with_context')
-        self.verify_tag(custom.params_and_context, 'params_and_context')
-        self.verify_tag(custom.simple_unlimited_args_kwargs, 'simple_unlimited_args_kwargs')
-        self.verify_tag(custom.simple_tag_without_context_parameter, 'simple_tag_without_context_parameter')
+        """ Test that the decorators preserve the decorated function's
+        docstring, name and attributes."""
 
-    def verify_tag(self, tag, name):
-        self.assertEqual(tag.__name__, name)
-        self.assertEqual(tag.__doc__, 'Expected %s __doc__' % name)
-        self.assertEqual(tag.__dict__['anything'], 'Expected %s __dict__' % name)
+        self.verify_tag('no_params')
+        self.verify_tag('no_params')
+        self.verify_tag('one_param')
+        self.verify_tag('explicit_no_context')
+        self.verify_tag('no_params_with_context')
+        self.verify_tag('params_and_context')
+        self.verify_tag('simple_unlimited_args_kwargs')
+        self.verify_tag('simple_tag_without_context_parameter')
 
     def test_simple_tag_missing_context(self):
         # The 'context' parameter must be present when takes_context is True
@@ -281,20 +292,22 @@ class CustomTagTests(TestCase):
             self.assert_render(template_content, expected_output)
 
     def test_inclusion_tag_registration(self):
-        # Test that the decorators preserve the decorated function's docstring, name and attributes.
-        self.verify_tag(custom.inclusion_no_params, 'inclusion_no_params')
-        self.verify_tag(custom.inclusion_one_param, 'inclusion_one_param')
-        self.verify_tag(custom.inclusion_explicit_no_context, 'inclusion_explicit_no_context')
-        self.verify_tag(custom.inclusion_no_params_with_context, 'inclusion_no_params_with_context')
-        self.verify_tag(custom.inclusion_params_and_context, 'inclusion_params_and_context')
-        self.verify_tag(custom.inclusion_two_params, 'inclusion_two_params')
-        self.verify_tag(custom.inclusion_one_default, 'inclusion_one_default')
-        self.verify_tag(custom.inclusion_unlimited_args, 'inclusion_unlimited_args')
-        self.verify_tag(custom.inclusion_only_unlimited_args, 'inclusion_only_unlimited_args')
-        self.verify_tag(custom.inclusion_tag_without_context_parameter, 'inclusion_tag_without_context_parameter')
-        self.verify_tag(custom.inclusion_tag_use_l10n, 'inclusion_tag_use_l10n')
-        self.verify_tag(custom.inclusion_tag_current_app, 'inclusion_tag_current_app')
-        self.verify_tag(custom.inclusion_unlimited_args_kwargs, 'inclusion_unlimited_args_kwargs')
+        """ Test that the decorators preserve the decorated function's
+        docstring, name and attributes."""
+
+        self.verify_tag('inclusion_no_params')
+        self.verify_tag('inclusion_one_param')
+        self.verify_tag('inclusion_explicit_no_context')
+        self.verify_tag('inclusion_no_params_with_context')
+        self.verify_tag('inclusion_params_and_context')
+        self.verify_tag('inclusion_two_params')
+        self.verify_tag('inclusion_one_default')
+        self.verify_tag('inclusion_unlimited_args')
+        self.verify_tag('inclusion_only_unlimited_args')
+        self.verify_tag('inclusion_tag_without_context_parameter')
+        self.verify_tag('inclusion_tag_use_l10n')
+        self.verify_tag('inclusion_tag_current_app')
+        self.verify_tag('inclusion_unlimited_args_kwargs')
 
     def test_15070_current_app(self):
         """ Test that inclusion tag passes down `current_app` of context to
@@ -455,19 +468,21 @@ class CustomTagTests(TestCase):
             self.assert_compilation_failes(template_content, error_message_regex)
 
     def test_assignment_tag_registration(self):
-        # Test that the decorators preserve the decorated function's docstring, name and attributes.
-        self.verify_tag(custom.assignment_no_params, 'assignment_no_params')
-        self.verify_tag(custom.assignment_one_param, 'assignment_one_param')
-        self.verify_tag(custom.assignment_explicit_no_context, 'assignment_explicit_no_context')
-        self.verify_tag(custom.assignment_no_params_with_context, 'assignment_no_params_with_context')
-        self.verify_tag(custom.assignment_params_and_context, 'assignment_params_and_context')
-        self.verify_tag(custom.assignment_one_default, 'assignment_one_default')
-        self.verify_tag(custom.assignment_two_params, 'assignment_two_params')
-        self.verify_tag(custom.assignment_unlimited_args, 'assignment_unlimited_args')
-        self.verify_tag(custom.assignment_only_unlimited_args, 'assignment_only_unlimited_args')
-        self.verify_tag(custom.assignment_unlimited_args, 'assignment_unlimited_args')
-        self.verify_tag(custom.assignment_unlimited_args_kwargs, 'assignment_unlimited_args_kwargs')
-        self.verify_tag(custom.assignment_tag_without_context_parameter, 'assignment_tag_without_context_parameter')
+        """ Test that the decorators preserve the decorated function's
+        docstring, name and attributes."""
+
+        self.verify_tag('assignment_no_params')
+        self.verify_tag('assignment_one_param')
+        self.verify_tag('assignment_explicit_no_context')
+        self.verify_tag('assignment_no_params_with_context')
+        self.verify_tag('assignment_params_and_context')
+        self.verify_tag('assignment_one_default')
+        self.verify_tag('assignment_two_params')
+        self.verify_tag('assignment_unlimited_args')
+        self.verify_tag('assignment_only_unlimited_args')
+        self.verify_tag('assignment_unlimited_args')
+        self.verify_tag('assignment_unlimited_args_kwargs')
+        self.verify_tag('assignment_tag_without_context_parameter')
 
     def test_assignment_tag_missing_context(self):
         # The 'context' parameter must be present when takes_context is True

@@ -306,6 +306,6 @@ def get_templatetags(engine):
         return "Expected result"
     assignment_tag_without_context_parameter.anything = "Expected assignment_tag_without_context_parameter __dict__"
 
-    return register
+    return locals()
 
-register = get_templatetags(None)
+register = get_templatetags(None)['register']
