@@ -1,33 +1,30 @@
-from django.template import VariableNode, Context
+from django.template import (VariableNode, Context, _Template,
+    TemplateEngineWithBuiltins)
 from django.template.loader import get_template_from_string
 from django.utils.unittest import TestCase
 from django.test.utils import override_settings
 
 class NodelistTest(TestCase):
 
+    def setUp(self):
+        self.engine = TemplateEngineWithBuiltins()
+
+    def assert_one_variable_node(self, template_content):
+        template = _Template(self.engine, template_content)
+        variables = template.nodelist.get_nodes_by_type(VariableNode)
+        self.assertEqual(len(variables), 1)
+
     def test_for(self):
-        source = '{% for i in 1 %}{{ a }}{% endfor %}'
-        template = get_template_from_string(source)
-        vars = template.nodelist.get_nodes_by_type(VariableNode)
-        self.assertEqual(len(vars), 1)
+        self.assert_one_variable_node('{% for i in 1 %}{{ a }}{% endfor %}')
 
     def test_if(self):
-        source = '{% if x %}{{ a }}{% endif %}'
-        template = get_template_from_string(source)
-        vars = template.nodelist.get_nodes_by_type(VariableNode)
-        self.assertEqual(len(vars), 1)
+        self.assert_one_variable_node('{% if x %}{{ a }}{% endif %}')
 
     def test_ifequal(self):
-        source = '{% ifequal x y %}{{ a }}{% endifequal %}'
-        template = get_template_from_string(source)
-        vars = template.nodelist.get_nodes_by_type(VariableNode)
-        self.assertEqual(len(vars), 1)
+        self.assert_one_variable_node('{% ifequal x y %}{{ a }}{% endifequal %}')
 
     def test_ifchanged(self):
-        source = '{% ifchanged x %}{{ a }}{% endifchanged %}'
-        template = get_template_from_string(source)
-        vars = template.nodelist.get_nodes_by_type(VariableNode)
-        self.assertEqual(len(vars), 1)
+        self.assert_one_variable_node('{% ifchanged x %}{{ a }}{% endifchanged %}')
 
 
 class ErrorIndexTest(TestCase):
