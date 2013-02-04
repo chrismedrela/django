@@ -220,9 +220,10 @@ class CustomTagTests(TestCase):
 
     def test_include_tag_missing_context(self):
         # The 'context' parameter must be present when takes_context is True
-        six.assertRaisesRegex(self, template.TemplateSyntaxError,
-            "'inclusion_tag_without_context_parameter' is decorated with takes_context=True so it must have a first argument of 'context'",
-            template.Template, '{% load custom %}{% inclusion_tag_without_context_parameter 123 %}')
+        self.assert_compilation_failes(
+            '{% load custom %}{% inclusion_tag_without_context_parameter 123 %}',
+            "'inclusion_tag_without_context_parameter' is decorated "
+            "with takes_context=True so it must have a first argument of 'context'")
 
     def test_inclusion_tags_from_template(self):
         c = template.Context({'value': 42})
