@@ -1,3 +1,5 @@
+from __future__ import absolute_import, unicode_literals
+
 from django.template.base import Lexer, Parser, tag_re, NodeList, VariableNode, TemplateSyntaxError
 from django.utils.encoding import force_text
 from django.utils.html import escape

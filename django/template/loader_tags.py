@@ -1,3 +1,5 @@
+from __future__ import absolute_import, unicode_literals
+
 from django.conf import settings
 from django.template.base import (TemplateSyntaxError, Library, Node, TextNode,
     token_kwargs, Variable)

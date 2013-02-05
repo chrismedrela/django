@@ -1,3 +1,5 @@
+from __future__ import absolute_import, unicode_literals
+
 from django.template import (VariableNode, Context, _Template,
     TemplateEngineWithBuiltins)
 from django.template.loader import get_template_from_string

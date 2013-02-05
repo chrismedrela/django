@@ -25,6 +25,8 @@
 # Python eggs) sets is_usable to False if the "pkg_resources" module isn't
 # installed, because pkg_resources is necessary to read eggs.
 
+from __future__ import absolute_import, unicode_literals
+
 from django.core.exceptions import ImproperlyConfigured
 from django.template.base import (Template, Context,
     TemplateDoesNotExist, get_default_engine, make_origin)

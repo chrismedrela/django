@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import, unicode_literals
+
 from copy import copy
 from django.core.exceptions import ImproperlyConfigured
 from django.utils.importlib import import_module
