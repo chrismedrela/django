@@ -1,4 +1,7 @@
 # Fake views for testing url reverse lookup
+
+from __future__ import absolute_import, unicode_literals
+
 from django.http import HttpResponse
 from django.template.response import TemplateResponse
 
