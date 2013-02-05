@@ -6,8 +6,10 @@ from inspect import getargspec
 
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
+from django.dispatch import receiver
 from django.template.context import (Context, RequestContext,
     ContextPopException)
+from django.test.signals import setting_changed
 from django.utils.importlib import import_module
 from django.utils.itercompat import is_iterable
 from django.utils.text import (smart_split, unescape_string_literal,
@@ -66,6 +68,11 @@ tag_re = (re.compile('(%s.*?%s|%s.*?%s|%s.*?%s)' %
 # True if TEMPLATE_STRING_IF_INVALID contains a format string (%s). None means
 # uninitialised.
 invalid_var_format_string = None
+@receiver(setting_changed)
+def clear_invalid_var_format_string_cache(sender, setting, value):
+    global invalid_var_format_string
+    if setting == 'TEMPLATE_STRING_IF_INVALID':
+        invalid_var_format_string = None
 
 
 class TemplateSyntaxError(Exception):
