@@ -1,7 +1,8 @@
 from __future__ import absolute_import, unicode_literals
 
 from django.http import HttpResponse
-from django.template import loader, Context, RequestContext
+from django.template import (loader, Context, RequestContext, _Template,
+    get_default_engine)
 from django.utils import six
 
 
@@ -13,7 +14,7 @@ class SimpleTemplateResponse(HttpResponse):
     rendering_attrs = ['template_name', 'context_data', '_post_render_callbacks']
 
     def __init__(self, template, context=None, content_type=None, status=None,
-            mimetype=None):
+            mimetype=None, engine=None):
         # It would seem obvious to call these next two members 'template' and
         # 'context', but those names are reserved as part of the test Client
         # API. To avoid the name collision, we use tricky-to-debug problems
@@ -21,6 +22,9 @@ class SimpleTemplateResponse(HttpResponse):
         self.context_data = context
 
         self._post_render_callbacks = []
+
+        self.engine = (template.engine if isinstance(template, _Template) else
+                       (engine or get_default_engine()))
 
         # content argument doesn't make sense here because it will be replaced
         # with rendered template so we always pass empty string in order to
@@ -50,6 +54,7 @@ class SimpleTemplateResponse(HttpResponse):
             if attr in obj_dict:
                 del obj_dict[attr]
 
+        import ipdb; ipdb.set_trace()
         return obj_dict
 
     def resolve_template(self, template):
@@ -79,9 +84,9 @@ class SimpleTemplateResponse(HttpResponse):
         response content, you must either call render(), or set the
         content explicitly using the value of this property.
         """
-        template = self.resolve_template(self.template_name)
+        self.template_instance = self.resolve_template(self.template_name)
         context = self.resolve_context(self.context_data)
-        content = template.render(context)
+        content = self.template_instance.render(context)
         return content
 
     def add_post_render_callback(self, callback):
