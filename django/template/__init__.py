@@ -49,6 +49,8 @@ u'<html><h1>Hello</h1></html>'
 u'<html></html>'
 """
 
+from __future__ import absolute_import, unicode_literals
+
 # Template lexing symbols
 from django.template.base import (ALLOWED_VARIABLE_CHARS, BLOCK_TAG_END,
     BLOCK_TAG_START, COMMENT_TAG_END, COMMENT_TAG_START,

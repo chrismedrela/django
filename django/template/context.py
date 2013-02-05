@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+from __future__ import absolute_import, unicode_literals
+
 from copy import copy
 from django.utils.module_loading import import_by_path
 
