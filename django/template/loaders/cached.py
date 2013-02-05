@@ -3,6 +3,8 @@ Wrapper class that takes a list of template loaders as an argument and attempts
 to load templates from them in order, caching the result.
 """
 
+from __future__ import absolute_import, unicode_literals
+
 import hashlib
 
 from django.template.base import (TemplateDoesNotExist, find_template_loader,

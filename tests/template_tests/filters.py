@@ -1,4 +1,5 @@
-# coding: utf-8
+# -*- coding: utf-8 -*-
+
 """
 Tests for template filters (as opposed to template tags).
 
@@ -6,6 +7,7 @@ The tests are hidden inside a function so that things like timestamps and
 timezones are only evaluated at the moment of execution and will therefore be
 consistent.
 """
+
 from __future__ import unicode_literals
 
 from datetime import date, datetime, time, timedelta

@@ -4,8 +4,9 @@ Test cases for the template loaders
 Note: This test requires setuptools!
 """
 
-from django.conf import settings
+from __future__ import absolute_import, unicode_literals
 
+from django.conf import settings
 if __name__ == '__main__':
     settings.configure()
 

@@ -3,6 +3,8 @@ Wrapper for loading templates from "templates" directories in INSTALLED_APPS
 packages.
 """
 
+from __future__ import absolute_import, unicode_literals
+
 import os
 import sys
 
