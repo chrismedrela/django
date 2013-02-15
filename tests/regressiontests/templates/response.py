@@ -315,38 +315,26 @@ class CustomURLConfTest(TestCase):
         self.assertContains(response, 'This is where you can find the snark: /snark/')
 
 
+@override_settings(CACHE_MIDDLEWARE_SECONDS=0.1,
+                   MIDDLEWARE_CLASSES=list(settings.MIDDLEWARE_CLASSES) + [
+                       'django.middleware.cache.FetchFromCacheMiddleware',
+                       'django.middleware.cache.UpdateCacheMiddleware',
+                   ])
 class CacheMiddlewareTest(TestCase):
     urls = 'regressiontests.templates.alternate_urls'
 
-    def setUp(self):
-        self.old_MIDDLEWARE_CLASSES = settings.MIDDLEWARE_CLASSES
-        self.CACHE_MIDDLEWARE_SECONDS = settings.CACHE_MIDDLEWARE_SECONDS
-
-        settings.CACHE_MIDDLEWARE_SECONDS = 2.0
-        settings.MIDDLEWARE_CLASSES = list(settings.MIDDLEWARE_CLASSES) + [
-            'django.middleware.cache.FetchFromCacheMiddleware',
-            'django.middleware.cache.UpdateCacheMiddleware',
-        ]
-
-    def tearDown(self):
-        settings.MIDDLEWARE_CLASSES = self.old_MIDDLEWARE_CLASSES
-        settings.CACHE_MIDDLEWARE_SECONDS = self.CACHE_MIDDLEWARE_SECONDS
-
     def test_middleware_caching(self):
-        response = self.client.get('/template_response_view/')
-        self.assertEqual(response.status_code, 200)
+        original_response = self.client.get('/template_response_view/')
+        self.assertEqual(original_response.status_code, 200)
 
-        time.sleep(1.0)
+        def assert_response(should_changed=False):
+            response = self.client.get('/template_response_view/')
+            self.assertEqual(response.status_code, 200)
+            response_changed = original_response.content != response.content
+            self.assertTrue(response_changed == should_changed)
 
-        response2 = self.client.get('/template_response_view/')
-        self.assertEqual(response2.status_code, 200)
-
-        self.assertEqual(response.content, response2.content)
-
-        time.sleep(2.0)
+        assert_response(should_changed=False)
 
         # Let the cache expire and test again
-        response2 = self.client.get('/template_response_view/')
-        self.assertEqual(response2.status_code, 200)
-
-        self.assertNotEqual(response.content, response2.content)
+        time.sleep(0.1)
+        assert_response(should_changed=True)
