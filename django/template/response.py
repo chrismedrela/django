@@ -1,7 +1,7 @@
 from __future__ import absolute_import, unicode_literals
 
 from django.http import HttpResponse
-from django.template import loader, Context, RequestContext
+from django.template import Context, RequestContext, get_default_engine, _Template
 from django.utils import six
 
 
@@ -13,7 +13,7 @@ class SimpleTemplateResponse(HttpResponse):
     rendering_attrs = ['template_name', 'context_data', '_post_render_callbacks']
 
     def __init__(self, template, context=None, content_type=None, status=None,
-            mimetype=None):
+            mimetype=None, engine=None):
         # It would seem obvious to call these next two members 'template' and
         # 'context', but those names are reserved as part of the test Client
         # API. To avoid the name collision, we use tricky-to-debug problems
@@ -21,6 +21,9 @@ class SimpleTemplateResponse(HttpResponse):
         self.context_data = context
 
         self._post_render_callbacks = []
+
+        self.engine = (template.engine if isinstance(template, _Template) else
+                       (engine or get_default_engine()))
 
         # content argument doesn't make sense here because it will be replaced
         # with rendered template so we always pass empty string in order to
@@ -42,6 +45,7 @@ class SimpleTemplateResponse(HttpResponse):
         rendered, and that the pickled state only includes rendered
         data, not the data used to construct the response.
         """
+
         obj_dict = super(SimpleTemplateResponse, self).__getstate__()
         if not self._is_rendered:
             raise ContentNotRenderedError('The response content must be '
@@ -50,14 +54,21 @@ class SimpleTemplateResponse(HttpResponse):
             if attr in obj_dict:
                 del obj_dict[attr]
 
+        # Don't save the template engine.
+        del obj_dict['engine']
+
         return obj_dict
+
+    def __setstate__(self, state):
+        super(SimpleTemplateResponse, self).__setstate__(state)
+        self.engine = get_default_engine()
 
     def resolve_template(self, template):
         "Accepts a template object, path-to-template or list of paths"
         if isinstance(template, (list, tuple)):
-            return loader.select_template(template)
+            return self.engine.select_template(template)
         elif isinstance(template, six.string_types):
-            return loader.get_template(template)
+            return self.engine.get_template(template)
         else:
             return template
 
