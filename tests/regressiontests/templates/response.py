@@ -297,17 +297,11 @@ class TemplateResponseTest(TestCase):
         repickled_response = pickle.dumps(unpickled_response)
 
 
+@override_settings(MIDDLEWARE_CLASSES=list(settings.MIDDLEWARE_CLASSES) + [
+    'regressiontests.templates.response.CustomURLConfMiddleware'
+])
 class CustomURLConfTest(TestCase):
     urls = 'regressiontests.templates.urls'
-
-    def setUp(self):
-        self.old_MIDDLEWARE_CLASSES = settings.MIDDLEWARE_CLASSES
-        settings.MIDDLEWARE_CLASSES = list(settings.MIDDLEWARE_CLASSES) + [
-            'regressiontests.templates.response.CustomURLConfMiddleware'
-        ]
-
-    def tearDown(self):
-        settings.MIDDLEWARE_CLASSES = self.old_MIDDLEWARE_CLASSES
 
     def test_custom_urlconf(self):
         response = self.client.get('/template_response_view/')
