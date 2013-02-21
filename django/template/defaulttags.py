@@ -8,7 +8,7 @@ from itertools import groupby, cycle as itertools_cycle
 import warnings
 
 from django.conf import settings
-from django.template.base import (Node, NodeList, _Template, Context, Library,
+from django.template.base import (Node, NodeList, Template, Context, Library,
     TemplateSyntaxError, VariableDoesNotExist, InvalidTemplateLibrary,
     BLOCK_TAG_START, BLOCK_TAG_END, VARIABLE_TAG_START, VARIABLE_TAG_END,
     SINGLE_BRACE_START, SINGLE_BRACE_END, COMMENT_TAG_START, COMMENT_TAG_END,
@@ -358,7 +358,7 @@ class SsiNode(Node):
             output = ''
         if self.parsed:
             try:
-                t = _Template(self.engine, output, name=filepath)
+                t = Template(output, name=filepath, engine=self.engine)
                 return t.render(context)
             except TemplateSyntaxError as e:
                 if settings.DEBUG:

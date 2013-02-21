@@ -1,7 +1,7 @@
 from __future__ import absolute_import, unicode_literals
 
 from django.http import HttpResponse
-from django.template import Context, RequestContext, get_default_engine, _Template
+from django.template import Context, RequestContext, get_default_engine, Template
 from django.utils import six
 
 
@@ -22,7 +22,7 @@ class SimpleTemplateResponse(HttpResponse):
 
         self._post_render_callbacks = []
 
-        self.engine = (template.engine if isinstance(template, _Template) else
+        self.engine = (template.engine if isinstance(template, Template) else
                        (engine or get_default_engine()))
 
         # content argument doesn't make sense here because it will be replaced

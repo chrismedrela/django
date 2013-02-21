@@ -14,7 +14,7 @@ class CustomFilterTests(TestCase):
         engine.set_loaders([app_directories.Loader()])
         custom_library = custom.get_templatetags(engine)['register']
         engine.add_library('custom', custom_library)
-        t = template._Template(engine, "{% load custom %}{{ string|trim:5 }}")
+        t = template.Template("{% load custom %}{{ string|trim:5 }}", engine=engine)
         context = template.Context({"string": "abcdefghijklmnopqrstuvwxyz"})
         output = t.render(context)
         self.assertEqual(output, "abcde")
@@ -31,14 +31,14 @@ class CustomTagTests(TestCase):
     # Helper functions
 
     def assert_render(self, template_content, expected_output, context=None):
-        t = template._Template(self.engine, template_content)
+        t = template.Template(template_content, engine=self.engine)
         context = context or template.Context({'value': 42})
         self.assertEqual(t.render(context), expected_output)
 
     def assert_compilation_failes(self, template_content, error_message_regex):
         six.assertRaisesRegex(self, template.TemplateSyntaxError,
             error_message_regex,
-            template._Template, self.engine, template_content)
+            template.Template, template_content, engine=self.engine)
 
     def verify_tag(self, name):
         tag = self.custom_templatetags_map[name]

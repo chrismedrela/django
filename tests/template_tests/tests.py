@@ -22,7 +22,7 @@ import warnings
 from django import template
 from django.core import urlresolvers
 from django.template import (base as template_base, loader, Context,
-    RequestContext, _Template, TemplateSyntaxError)
+    RequestContext, Template, TemplateSyntaxError)
 from django.template.loaders import app_directories, filesystem, cached
 from django.test import RequestFactory, TestCase
 from django.test.utils import (setup_test_template_loader,
@@ -343,7 +343,7 @@ class Templates(TestCase):
     @override_settings(SETTINGS_MODULE=None, TEMPLATE_DEBUG=True)
     def test_url_reverse_no_settings_module(self):
         # Regression test for #9005
-        t = _Template(self.engine, '{% url will_not_match %}')
+        t = Template('{% url will_not_match %}', engine=self.engine)
         c = Context()
         with self.assertRaises(urlresolvers.NoReverseMatch):
             t.render(c)
@@ -351,7 +351,7 @@ class Templates(TestCase):
     @override_settings(TEMPLATE_STRING_IF_INVALID='%s is invalid', SETTINGS_MODULE='also_something')
     def test_url_reverse_view_name(self):
         # Regression test for #19827
-        t = _Template(self.engine, '{% url will_not_match %}')
+        t = Template('{% url will_not_match %}', engine=self.engine)
         c = Context()
         try:
             t.render(c)
@@ -366,7 +366,7 @@ class Templates(TestCase):
 
     def test_url_explicit_exception_for_old_syntax_at_run_time(self):
         # Regression test for #19280
-        t = _Template(self.engine, '{% url path.to.view %}')      # not quoted = old syntax
+        t = Template('{% url path.to.view %}', engine=self.engine)      # not quoted = old syntax
         c = Context()
         with six.assertRaisesRegex(self, urlresolvers.NoReverseMatch,
                 "The syntax changed in Django 1.5, see the docs."):
@@ -376,7 +376,7 @@ class Templates(TestCase):
         # Regression test for #19392
         with six.assertRaisesRegex(self, template.TemplateSyntaxError,
                 "The syntax of 'url' changed in Django 1.5, see the docs."):
-            t = _Template(self.engine, '{% url my-view %}')
+            t = Template('{% url my-view %}', engine=self.engine)
 
     @override_settings(DEBUG=True, TEMPLATE_DEBUG=True)
     def test_no_wrapped_exception(self):
@@ -385,7 +385,7 @@ class Templates(TestCase):
         Refs #16770
         """
         c = Context({"coconuts": lambda: 42 / 0})
-        t = _Template(self.engine, "{{ coconuts }}")
+        t = Template("{{ coconuts }}", engine=self.engine)
         with self.assertRaises(ZeroDivisionError) as cm:
             t.render(c)
 
@@ -394,16 +394,17 @@ class Templates(TestCase):
     def test_invalid_block_suggestion(self):
         # See #7876
         try:
-            t = _Template(self.engine, "{% if 1 %}lala{% endblock %}{% endif %}")
+            t = Template("{% if 1 %}lala{% endblock %}{% endif %}", engine=self.engine)
         except template.TemplateSyntaxError as e:
             self.assertEqual(e.args[0], "Invalid block tag: 'endblock', expected 'elif', 'else' or 'endif'")
 
     def test_ifchanged_concurrency(self):
         # Tests for #15849
-        template = _Template(self.engine,
+        template = Template(
             '[0{% for x in foo %},{% with var=get_value %}'
             '{% ifchanged %}{{ var }}{% endifchanged %}'
-            '{% endwith %}{% endfor %}]')
+            '{% endwith %}{% endfor %}]',
+            engine=self.engine)
 
         # Using generator to mimic concurrency.
         # The generator is not passed to the 'for' loop, because it does a list(values)
@@ -425,7 +426,9 @@ class Templates(TestCase):
     def test_ifchanged_render_once(self):
         """ Test for ticket #19890. The content of ifchanged template tag was
         rendered twice."""
-        template = _Template(self.engine, '{% ifchanged %}{% cycle "1st time" "2nd time" %}{% endifchanged %}')
+        template = Template(
+            '{% ifchanged %}{% cycle "1st time" "2nd time" %}{% endifchanged %}',
+            engine=self.engine)
         output = template.render(Context({}))
         self.assertEqual(output, '1st time')
 
@@ -1293,10 +1296,10 @@ class SmallTests(TestCase):
             'inheritance23': ("{% extends 'inheritance20' %}{% block first %}{{ block.super }}b{% endblock %}", {}, '1&ab3_'),
 
             # Inheritance from local context without use of template loader
-            'inheritance24': ("{% extends context_template %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", lambda engine: {'context_template': template._Template(engine, "1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")}, '1234'),
+            'inheritance24': ("{% extends context_template %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", lambda engine: {'context_template': template.Template("1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}", engine=engine)}, '1234'),
 
             # Inheritance from local context with variable parent template
-            'inheritance25': ("{% extends context_template.1 %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", lambda engine: {'context_template': [template._Template(engine, "Wrong"), template._Template(engine, "1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}")]}, '1234'),
+            'inheritance25': ("{% extends context_template.1 %}{% block first %}2{% endblock %}{% block second %}4{% endblock %}", lambda engine: {'context_template': [template.Template("Wrong", engine=engine), template.Template("1{% block first %}_{% endblock %}3{% block second %}_{% endblock %}", engine=engine)]}, '1234'),
 
             # Set up a base template to extend
             'inheritance26': ("no tags", {}, 'no tags'),
@@ -1822,10 +1825,10 @@ class TemplateTagLoading(unittest.TestCase):
     def test_load_error(self):
         source = "{% load broken_tag %}"
         self.assertRaises(template.TemplateSyntaxError,
-                          template._Template,
-                          self.engine, source)
+                          template.Template,
+                          source, engine=self.engine)
         try:
-            template._Template(self.engine, source)
+            template.Template(source, engine=self.engine)
         except template.TemplateSyntaxError as e:
             self.assertTrue('ImportError' in e.args[0])
             self.assertTrue('Xtemplate' in e.args[0])
@@ -1836,10 +1839,10 @@ class TemplateTagLoading(unittest.TestCase):
         sys.path.append(egg_name)
         settings.INSTALLED_APPS = ('tagsegg',)
         self.assertRaises(template.TemplateSyntaxError,
-                          template._Template,
-                          self.engine, source)
+                          template.Template,
+                          source, engine=self.engine)
         try:
-            template._Template(self.engine, source)
+            template.Template(source, engine=self.engine)
         except template.TemplateSyntaxError as e:
             self.assertTrue('ImportError' in e.args[0])
             self.assertTrue('Xtemplate' in e.args[0])
@@ -1849,7 +1852,7 @@ class TemplateTagLoading(unittest.TestCase):
         egg_name = '%s/tagsegg.egg' % self.egg_dir
         sys.path.append(egg_name)
         settings.INSTALLED_APPS = ('tagsegg',)
-        t = template._Template(self.engine, source)
+        t = template.Template(source, engine=self.engine)
 
 class RequestContextTests(unittest.TestCase):
     """
@@ -1862,12 +1865,12 @@ class RequestContextTests(unittest.TestCase):
         templates = {}
         loaders = [DictionaryLoader(templates)]
         self.engine = template.TemplateEngineWithBuiltins(loaders)
-        templates['child'] = _Template(self.engine, '{{ var|default:"none" }}')
+        templates['child'] = Template('{{ var|default:"none" }}', engine=self.engine)
         self.fake_request = RequestFactory().get('/')
 
     def test(self):
         context = RequestContext(self.fake_request, {'var': 'parent'})
-        template = _Template(self.engine, '{% include "child" %}')
+        template = Template('{% include "child" %}', engine=self.engine)
         self.assertEqual(template.render(context), 'parent')
-        template = _Template(self.engine, '{% include "child" only %}')
+        template = Template('{% include "child" only %}', engine=self.engine)
         self.assertEqual(template.render(context), 'none')

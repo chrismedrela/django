@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
-from django.template import (_Template, TemplateEncodingError, Context,
+from django.template import (Template, TemplateEncodingError, Context,
     TemplateEngineWithBuiltins)
 from django.utils.safestring import SafeData
 from django.utils import six
@@ -13,16 +13,16 @@ class UnicodeTests(TestCase):
         engine = TemplateEngineWithBuiltins()
 
         # Templates can be created from unicode strings.
-        first_template = _Template(engine, 'ŠĐĆŽćžšđ {{ var }}')
+        first_template = Template('ŠĐĆŽćžšđ {{ var }}', engine=engine)
 
         # Templates can also be created from bytestrings. These are assumed to
         # be encoded using UTF-8.
         source = (b'\xc5\xa0\xc4\x90\xc4\x86\xc5\xbd\xc4\x87\xc5\xbe'
                   b'\xc5\xa1\xc4\x91 {{ var }}')
-        second_template = _Template(engine, source)
+        second_template = Template(source, engine=engine)
 
         source = b'\x80\xc5\xc0'
-        self.assertRaises(TemplateEncodingError, _Template, engine, source)
+        self.assertRaises(TemplateEncodingError, Template, source, engine=engine)
 
         # Contexts can be constructed from unicode or UTF-8 bytestrings.
         c1 = Context({b"var": b"foo"})
