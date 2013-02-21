@@ -6,7 +6,7 @@ to load templates from them in order, caching the result.
 from __future__ import absolute_import, unicode_literals
 
 import hashlib
-from django.template.base import (TemplateDoesNotExist, make_origin, _Template,
+from django.template.base import (TemplateDoesNotExist, make_origin, Template,
     find_template_loader)
 from django.template.loader import BaseLoader, get_template_from_string
 
@@ -50,8 +50,8 @@ class Loader(BaseLoader):
             template, origin = self.find_template(template_name, template_dirs)
             if not hasattr(template, 'render'):
                 try:
-                    template = _Template(self.engine, template,
-                                         origin, template_name)
+                    template = Template(template, origin, template_name,
+                                        engine=self.engine)
                 except TemplateDoesNotExist:
                     # If compiling the template we found raises
                     # TemplateDoesNotExist, back off to returning the source
