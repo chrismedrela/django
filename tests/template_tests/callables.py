@@ -9,7 +9,7 @@ class CallableVariablesTests(TestCase):
         self.engine = template.TemplateEngineWithBuiltins()
 
     def assert_render(self, template_content, expected_output, context):
-        t = template._Template(self.engine, template_content)
+        t = template.Template(template_content, engine=self.engine)
         self.assertEqual(t.render(context), expected_output)
 
     def get_doodad(self, alters_data=None, do_not_call_in_templates=None):

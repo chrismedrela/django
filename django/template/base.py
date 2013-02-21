@@ -117,9 +117,9 @@ class StringOrigin(Origin):
     def reload(self):
         return self.source
 
-class _Template(object):
-    def __init__(self, engine, template_string, origin=None,
-                 name='<Unknown Template>'):
+class Template(object):
+    def __init__(self, template_string, origin=None,
+                 name='<Unknown Template>', engine=None):
         try:
             template_string = force_text(template_string)
         except UnicodeDecodeError:
@@ -127,9 +127,9 @@ class _Template(object):
                                         "from unicode or UTF-8 strings.")
         if settings.TEMPLATE_DEBUG and origin is None:
             origin = StringOrigin(template_string)
-        self.nodelist = engine.compile_string(template_string, origin)
+        self.engine = engine or get_default_engine()
+        self.nodelist = self.engine.compile_string(template_string, origin)
         self.name = name
-        self.engine = engine
 
     def __iter__(self):
         for node in self.nodelist:
@@ -146,9 +146,6 @@ class _Template(object):
             return self._render(context)
         finally:
             context.render_context.pop()
-
-def Template(*args, **kwargs):
-    return _Template(get_default_engine(), *args, **kwargs)
 
 def compile_string(*args, **kwargs):
     return get_default_engine().compile_string(*args, **kwargs)
@@ -1199,7 +1196,7 @@ class Library(object):
                     _dict = func(*resolved_args, **resolved_kwargs)
 
                     if not getattr(self, 'nodelist', False):
-                        if isinstance(file_name, _Template):
+                        if isinstance(file_name, Template):
                             t = file_name
                         elif (not isinstance(file_name, six.string_types) and
                               is_iterable(file_name)):
@@ -1366,7 +1363,7 @@ class TemplateEngine(object):
         return parser.parse()
 
     def find_template(self, name, dirs=None):
-        """ Returns tuple of _Template instance and origin. """
+        """ Returns tuple of Template instance and origin. """
 
         for loader in self._template_source_loaders:
             try:
@@ -1375,8 +1372,8 @@ class TemplateEngine(object):
                 pass
             else:
                 origin = make_origin(display_name, loader, name, dirs)
-                if not isinstance(template, _Template):
-                    template = _Template(self, template, origin, name)
+                if not isinstance(template, Template):
+                    template = Template(template, origin, name, engine=self)
                 return template, origin
         raise TemplateDoesNotExist(name)
 

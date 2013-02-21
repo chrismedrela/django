@@ -1,6 +1,6 @@
 from __future__ import absolute_import, unicode_literals
 
-from django.template import (VariableNode, Context, _Template,
+from django.template import (VariableNode, Context, Template,
     TemplateEngineWithBuiltins)
 from django.template.loader import get_template_from_string
 from django.utils.unittest import TestCase
@@ -12,7 +12,7 @@ class NodelistTest(TestCase):
         self.engine = TemplateEngineWithBuiltins()
 
     def assert_one_variable_node(self, template_content):
-        template = _Template(self.engine, template_content)
+        template = Template(template_content, engine=self.engine)
         variables = template.nodelist.get_nodes_by_type(VariableNode)
         self.assertEqual(len(variables), 1)
 
@@ -73,7 +73,7 @@ class ErrorIndexTest(TestCase):
         })
         engine = TemplateEngineWithBuiltins()
         for source, expected_error_source_index in tests:
-            template = _Template(engine, source)
+            template = Template(source, engine=engine)
             try:
                 template.render(context)
             except (RuntimeError, TypeError) as e:

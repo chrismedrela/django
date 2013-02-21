@@ -8,7 +8,7 @@ from __future__ import absolute_import, unicode_literals
 import hashlib
 
 from django.template.base import (TemplateDoesNotExist, find_template_loader,
-    make_origin, _Template)
+    make_origin, Template)
 from django.template.loader import BaseLoader
 from django.utils.encoding import force_bytes
 
@@ -53,8 +53,8 @@ class Loader(BaseLoader):
             template, origin = self.find_template(template_name, template_dirs)
             if not hasattr(template, 'render'):
                 try:
-                    template = _Template(self.engine, template,
-                                         origin, template_name)
+                    template = Template(template, origin, template_name,
+                                        engine=self.engine)
                 except TemplateDoesNotExist:
                     # If compiling the template we found raises
                     # TemplateDoesNotExist, back off to returning the source
