@@ -147,9 +147,6 @@ class Template(object):
         finally:
             context.render_context.pop()
 
-def compile_string(*args, **kwargs):
-    return get_default_engine().compile_string(*args, **kwargs)
-
 class Token(object):
     def __init__(self, token_type, contents):
         # token_type must be TOKEN_TEXT, TOKEN_VAR, TOKEN_BLOCK or
@@ -1296,15 +1293,9 @@ def get_templatetags_modules():
         templatetags_modules = _templatetags_modules
     return templatetags_modules
 
-def get_library(library_name):
-    return get_default_engine().get_library(library_name)
-
-def add_to_builtins(module):
-    get_default_engine().add_to_builtins(module)
-
 
 class TemplateEngine(object):
-    """ You have to pass loaders to __init__ or set_loaders before first use. """
+    """ You have to pass loaders to __init__ or set_loaders before first use."""
 
     def __init__(self, loaders=None):
         self._libraries = {}
@@ -1465,17 +1456,8 @@ def make_origin(display_name, loader, name, dirs):
         return None
 
 
-def _calculate_template_source_loaders(engine):
-    # Warning! Don't call while the module is being importing. Calculating
-    # loaders at the time of importing module may cause circular import
-    # errors. See Django ticket #1292.
-
-    loaders = []
-    for loader_name in settings.TEMPLATE_LOADERS:
-        loader = find_template_loader(loader_name, engine)
-        if loader is not None:
-            loaders.append(loader)
-    return tuple(loaders)
+# Global instance of template engine and functions delegating to it kept for
+# backward compability.
 
 _default_engine = None
 def get_default_engine():
@@ -1489,6 +1471,28 @@ def get_default_engine():
         _default_engine.add_to_builtins('django.template.loader_tags')
     return _default_engine
 
+def _calculate_template_source_loaders(engine):
+    # Warning! Don't call while the module is being importing. Calculating
+    # loaders at the time of importing module may cause circular import
+    # errors. See Django ticket #1292.
+
+    loaders = []
+    for loader_name in settings.TEMPLATE_LOADERS:
+        loader = find_template_loader(loader_name, engine)
+        if loader is not None:
+            loaders.append(loader)
+    return tuple(loaders)
+
 def invalidate_default_engine():
     global _default_engine
     _default_engine = None
+
+
+def get_library(library_name):
+    return get_default_engine().get_library(library_name)
+
+def add_to_builtins(module):
+    get_default_engine().add_to_builtins(module)
+
+def compile_string(*args, **kwargs):
+    return get_default_engine().compile_string(*args, **kwargs)
