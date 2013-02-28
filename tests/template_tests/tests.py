@@ -227,8 +227,7 @@ class Templates(TestCase):
 
         # Also test the cached loader, since it overrides load_template
         engine = template.TemplateEngineWithBuiltins()
-        cache_loader = cached.Loader([], engine)
-        cache_loader._cached_loaders = [loader]
+        cache_loader = cached.Loader([loader], engine)
         engine.set_loaders([cache_loader])
 
         tmpl = engine.find_template(load_name)[0]
@@ -304,8 +303,7 @@ class Templates(TestCase):
 
         engine = template.TemplateEngineWithBuiltins()
         loader = app_directories.Loader(engine)
-        cache_loader = cached.Loader(('',), engine)
-        cache_loader._cached_loaders = (loader,)
+        cache_loader = cached.Loader([loader], engine)
         engine.set_loaders([cache_loader])
 
         load_name = 'test_extends_error.html'
@@ -514,8 +512,7 @@ class SmallTests(TestCase):
         dict_loader = DictionaryLoader(templates)
         app_loader = app_directories.Loader()
         engine = template.TemplateEngineWithBuiltins()
-        cache_loader = cached.Loader(('fake loader',), engine)
-        cache_loader._cached_loaders = (dict_loader, app_loader)
+        cache_loader = cached.Loader([dict_loader, app_loader], engine)
         engine.set_loaders([cache_loader])
         engine.add_library('custom', custom.get_templatetags(engine)['register'])
         engine.add_library('testtags', self._get_library_of_custom_template_tags())

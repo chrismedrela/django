@@ -19,23 +19,10 @@ class Loader(BaseLoader):
     def __init__(self, loaders, *args, **kwargs):
         super(Loader, self).__init__(*args, **kwargs)
         self.template_cache = {}
-        self._loaders = loaders
-        self._cached_loaders = []
-
-    @property
-    def loaders(self):
-        # Resolve loaders on demand to avoid circular imports
-        if not self._cached_loaders:
-            # Set self._cached_loaders atomically. Otherwise, another thread
-            # could see an incomplete list. See #17303.
-            cached_loaders = []
-            for loader in self._loaders:
-                cached_loaders.append(find_template_loader(loader, self.engine))
-            self._cached_loaders = cached_loaders
-        return self._cached_loaders
+        self._loaders = [find_template_loader(loader, self.engine) for loader in loaders]
 
     def find_template(self, name, dirs=None):
-        for loader in self.loaders:
+        for loader in self._loaders:
             try:
                 template, display_name = loader(name, dirs)
                 return (template, make_origin(display_name, loader, name, dirs))
