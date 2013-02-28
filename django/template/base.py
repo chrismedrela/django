@@ -1422,6 +1422,9 @@ def TemplateEngineWithBuiltins(*args, **kwargs):
     return engine
 
 def find_template_loader(loader, engine):
+    from django.template.loader import BaseLoader
+    if isinstance(loader, BaseLoader):
+        return loader
     if isinstance(loader, (tuple, list)):
         loader, args = loader[0], (list(loader[1:])+[engine])
     else:
