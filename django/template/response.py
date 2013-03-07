@@ -44,6 +44,10 @@ class SimpleTemplateResponse(HttpResponse):
         Ensures that the object can't be pickled before it has been
         rendered, and that the pickled state only includes rendered
         data, not the data used to construct the response.
+
+        The template engine is not pickled. During unpickling, call
+        `get_default_engine` to restore the engine.
+
         """
 
         obj_dict = super(SimpleTemplateResponse, self).__getstate__()

@@ -140,7 +140,7 @@ class Template(object):
         return self.nodelist.render(context)
 
     def render(self, context):
-        "Display stage -- can be called many times"
+        """ Display stage -- can be called many times."""
         context.render_context.push()
         try:
             return self._render(context)
@@ -1270,13 +1270,9 @@ def import_library(taglib_module):
                                      taglib_module)
 
 templatetags_modules = []
-
 def get_templatetags_modules():
-    """
-    Return the list of all available template tag modules.
-
-    Caches the result for faster access.
-    """
+    """ Return the list of all available template tag modules. Caches the
+    result for faster access. """
     global templatetags_modules
     if not templatetags_modules:
         _templatetags_modules = []
@@ -1295,14 +1291,24 @@ def get_templatetags_modules():
 
 
 class TemplateEngine(object):
-    """ You have to pass loaders to __init__ or set_loaders before first use."""
+    """ TemplateEngine manages loading, parsing and creating Template
+    instances.
+
+    A list of loaders should be provided before first use.
+
+    """
 
     def __init__(self, loaders=None):
+        """ If you don't pass list of loaders, then you have to call
+        `set_loaders` before first use."""
+
         self._libraries = {}
+
+        # Global list of libraries to load by default for a new parser
+        self._builtins = []
+
         # None means that building this object is not finished
         self._template_source_loaders = None
-        # global list of libraries to load by default for a new parser
-        self._builtins = []
         if loaders is not None:
             self.set_loaders(loaders)
 
@@ -1354,7 +1360,7 @@ class TemplateEngine(object):
         return parser.parse()
 
     def find_template(self, name, dirs=None):
-        """ Returns tuple of Template instance and origin. """
+        """ Returns tuple of Template instance and its origin. """
 
         for loader in self._template_source_loaders:
             try:
@@ -1369,6 +1375,7 @@ class TemplateEngine(object):
         raise TemplateDoesNotExist(name)
 
     def get_template(self, name, dirs=None):
+        """ Return Template instace only. """
         return self.find_template(name, dirs)[0]
 
     def select_template(self, template_names):
@@ -1402,6 +1409,10 @@ class TemplateEngine(object):
 
 
 def TemplateEngineWithBuiltins(*args, **kwargs):
+    """ Return new TemplateEngine instance with default builtins (defaulttags,
+    defaultfilters and loader_tags from django.template). Use it only in
+    tests."""
+
     engine = TemplateEngine(*args, **kwargs)
     builtins = [
         'django.template.defaulttags',
@@ -1413,15 +1424,35 @@ def TemplateEngineWithBuiltins(*args, **kwargs):
     return engine
 
 def find_template_loader(loader, engine):
+    """ Try to create and return source template loader. Return None if the
+    loader is not supported by your Python installation. The second argument
+    is an TemplateEngine instace. The first argument may be:
+
+    - a loader -- in that case just return the loader;
+
+    - a path to function-based loader -- in that case try to load the module
+      and return the loader;
+
+    - a pair of path to class-based loader and list of arguments -- in that
+      case try to load the loader class, create and return its instance
+      passing the arguments extended with the engine and return it.
+
+    """
+
+    # Is it just a loader?
     from django.template.loader import BaseLoader
     if isinstance(loader, BaseLoader):
         return loader
+
+    # Unpack the first argument if it's a tuple.
     if isinstance(loader, (tuple, list)):
         loader, args = loader[0], list(loader[1:])
     else:
         args = []
 
+    # We received a path to the loader.
     if isinstance(loader, six.string_types):
+        # Load the module and then load the loader.
         module, attr = loader.rsplit('.', 1)
         try:
             mod = import_module(module)
@@ -1432,24 +1463,30 @@ def find_template_loader(loader, engine):
         except AttributeError as e:
             raise ImproperlyConfigured('Error importing template source loader %s: "%s"' % (loader, e))
 
+        # Class-based loader?
         if hasattr(TemplateLoader, 'load_template_source'):
             func = TemplateLoader(*args, engine=engine)
 
+        # Function-based loader?
         else:
             if args:
                 raise ImproperlyConfigured("Error importing template source loader %s - can't pass arguments to function-based loader." % loader)
             func = TemplateLoader
 
+        # Warn the user and return None if the loader is not usable.
         if not func.is_usable:
             import warnings
             warnings.warn("Your TEMPLATE_LOADERS setting includes %r, but your Python installation doesn't support that type of template loading. Consider removing that line from TEMPLATE_LOADERS." % loader)
             return None
         else:
             return func
+
+    # We received neither a loader nor its path.
     else:
         raise ImproperlyConfigured('Loader does not define a "load_template" callable template source loader')
 
 def make_origin(display_name, loader, name, dirs):
+    """ Return origin or None. """
     if settings.TEMPLATE_DEBUG and display_name:
         return LoaderOrigin(display_name, loader, name, dirs)
     else:
@@ -1461,6 +1498,10 @@ def make_origin(display_name, loader, name, dirs):
 
 _default_engine = None
 def get_default_engine():
+    """ Return the global instance of TemplateEngine. The instance is created
+    on the first call and after each invalidation. Subsequent calls return the
+    same instance."""
+
     global _default_engine
     if _default_engine is None:
         _default_engine = TemplateEngine()
@@ -1472,9 +1513,8 @@ def get_default_engine():
     return _default_engine
 
 def _calculate_template_source_loaders(engine):
-    # Warning! Don't call while the module is being importing. Calculating
-    # loaders at the time of importing module may cause circular import
-    # errors. See Django ticket #1292.
+    """ Return list of template loaders basing on the TEMPLATE_LOADERS
+    setting."""
 
     loaders = []
     for loader_name in settings.TEMPLATE_LOADERS:
@@ -1484,9 +1524,14 @@ def _calculate_template_source_loaders(engine):
     return tuple(loaders)
 
 def invalidate_default_engine():
+    """ Next call of `get_default_engine` will return new instance of
+    TemplateEngine. Use it only in tests. Useful, when the global engine
+    relies on a setting which was changed. """
+
     global _default_engine
     _default_engine = None
 
+# Functions delegating to the default engine.
 
 def get_library(library_name):
     return get_default_engine().get_library(library_name)

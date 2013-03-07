@@ -58,6 +58,8 @@ class BaseLoader(object):
         pass
 
 
+# Functions delegating to the global instance of TemplateEngine.
+
 def find_template(name, dirs=None):
     return get_default_engine().find_template(name, dirs)
 

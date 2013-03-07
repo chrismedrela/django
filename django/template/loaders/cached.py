@@ -53,5 +53,5 @@ class Loader(BaseLoader):
         return self.template_cache[key], None
 
     def reset(self):
-        "Empty the template cache."
+        """ Empty the template cache."""
         self.template_cache.clear()
