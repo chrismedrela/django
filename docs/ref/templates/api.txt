@@ -49,6 +49,13 @@ to a template.
 A template **renders** a context by replacing the variable "holes" with values
 from the context and executing all block tags.
 
+.. versionadded:: 1.6
+    Django 1.6 comes with new TemplateEngine class. An engine manages loading,
+    parsing and rendering templates. Most of time you don't need to know that
+    because Django uses the :ref:`global template engine
+    <topic-global-template-engine>` by default. Although it's still possible
+    to create a lot of independent template engines.
+
 Using the template system
 =========================
 
@@ -80,6 +87,12 @@ takes one argument -- the raw template code::
 
     Even the parsing itself is quite fast. Most of the parsing happens via a
     single call to a single, short, regular expression.
+
+.. versionadded:: 1.6
+    By default, Django assumes that you want to work with the :ref:`global template
+    engine <topic-global-template-engine>`. If you want to use your own template engine, you can pass it to
+    `Template` constructor as ``engine`` keyword argument,
+    i. e. ``Template(template_source, engine=my_engine)``.
 
 Rendering a context
 -------------------
@@ -528,10 +541,10 @@ Generally, you'll store templates in files on your filesystem rather than using
 the low-level ``Template`` API yourself. Save templates in a directory
 specified as a **template directory**.
 
-Django searches for template directories in a number of places, depending on
-your template-loader settings (see "Loader types" below), but the most basic
-way of specifying template directories is by using the :setting:`TEMPLATE_DIRS`
-setting.
+The :ref:`global template engine <topic-global-template-engine>` searches for
+template directories in a number of places, depending on your template-loader
+settings (see "Loader types" below), but the most basic way of specifying
+template directories is by using the :setting:`TEMPLATE_DIRS` setting.
 
 The TEMPLATE_DIRS setting
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -597,6 +610,11 @@ When Django finds a template that exists, it stops looking.
     ``select_template(['story_%s_detail.html' % story.id, 'story_detail.html'])``.
     That'll allow you to use a custom template for an individual story, with a
     fallback template for stories that don't have custom templates.
+
+.. versionadded:: 1.6
+    Both ``get_template`` and ``select_template`` functions are shortcuts for
+    calling equivalent methods of the :ref:`global template engine
+    <topic-global-template-engine>`.
 
 Using subdirectories
 ~~~~~~~~~~~~~~~~~~~~
@@ -759,6 +777,11 @@ See also the :func:`~django.shortcuts.render_to_response()` shortcut, which
 calls ``render_to_string`` and feeds the result into an :class:`~django.http.HttpResponse`
 suitable for returning directly from a view.
 
+.. versionadded:: 1.6
+    This function assumes you work with the :ref:`global template engine
+    <topic-global-template-engine>`. There is no equivalent method in
+    :class:`~django.template.TemplateEngine` class.
+
 Configuring the template system in standalone mode
 ==================================================
 
@@ -788,6 +811,60 @@ and :setting:`TEMPLATE_DEBUG`. If you plan to use the :ttag:`url` template tag,
 you will also need to set the :setting:`ROOT_URLCONF` setting. All available
 settings are described in the :doc:`settings documentation </ref/settings>`,
 and any setting starting with ``TEMPLATE_`` is of obvious interest.
+
+
+.. _topic-template-engine:
+
+The template engine class
+==========================
+
+Django 1.6 comes with new :class:`~django.template.TemplateEngine` class. The
+class manages loading, parsing and rendering templates. The class may be
+useful when you need a lot of independent template engines, for example one
+for rendering html files and one for generating emails. Another use case is
+writing tests. Each template engine has its own list of loaders. All template
+engines shares the same libraries of template tags and filters.
+
+.. class:: django.template.TemplateEngine
+
+.. method:: set_loaders(loaders)
+
+    This method should be called before first use of a template engine if the
+    list of template source loaders wasn't provide for __init__ method. This
+    two-steps way of creating a template engine may be useful in tests because
+    the custom engine should be passed on to the loaders::
+
+        engine = TemplateEngine()
+        loader = loaders.filesystem.Loader(engine=engine)
+        engine.set_loaders([loader])
+
+.. method:: get_template(name, dirs=None)
+
+    The same as ``get_template``.
+
+.. method:: select_template(template_names)
+
+    The same as ``select_template``.
+
+
+The global template engine
+--------------------------
+
+.. _topic-global-template-engine:
+
+By default, Django uses one global template engine. The list of loaders used
+by it is defined by :setting:`TEMPLATE_LOADERS` setting.
+
+.. function:: get_default_engine()
+
+    Return the global default engine. The global engine is created at the
+    first call of this function, so settings must be configured before the
+    first call.
+
+.. versionadded:: 1.6
+    Before 1.6 version there was no TemplateEngine class neither the global
+    template engine.
+
 
 .. _topic-template-alternate-language:
 
